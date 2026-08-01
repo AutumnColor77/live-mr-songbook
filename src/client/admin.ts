@@ -192,7 +192,14 @@ async function mountDashboard(root: HTMLElement, slug: string): Promise<void> {
 
     $("#admin-now-playing").textContent = nowPlayingLabel(status);
 
-    const active = requests.filter((r) => r.status === "pending" || r.status === "playing");
+    const active = requests
+      .filter((r) => r.status === "pending" || r.status === "playing")
+      .sort((a, b) => {
+        // Playing first, then FIFO (oldest request = #1)
+        if (a.status === "playing" && b.status !== "playing") return -1;
+        if (b.status === "playing" && a.status !== "playing") return 1;
+        return a.createdAt - b.createdAt;
+      });
     $("#admin-queue-count").textContent = String(active.length);
     const list = $("#admin-queue-list");
 
