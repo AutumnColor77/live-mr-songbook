@@ -1,6 +1,7 @@
 import {
   AdminAuthError,
   clearAdminToken,
+  clearQueue,
   fetchAdminRequests,
   fetchPublicStatus,
   getAdminToken,
@@ -155,9 +156,12 @@ async function mountDashboard(root: HTMLElement, slug: string): Promise<void> {
         </section>
 
         <section class="space-y-3">
-          <div class="flex items-center justify-between px-1">
-            <h2 class="text-sm font-extrabold text-muted tracking-wide">대기열</h2>
-            <span id="admin-queue-count" class="count-badge">0</span>
+          <div class="flex items-center justify-between px-1 gap-2">
+            <div class="flex items-center gap-2">
+              <h2 class="text-sm font-extrabold text-muted tracking-wide">대기열</h2>
+              <span id="admin-queue-count" class="count-badge">0</span>
+            </div>
+            <button id="queue-clear" type="button" class="secondary-btn btn-sm">초기화</button>
           </div>
           <div id="admin-queue-list" class="space-y-2"></div>
         </section>
@@ -201,6 +205,7 @@ async function mountDashboard(root: HTMLElement, slug: string): Promise<void> {
         return a.createdAt - b.createdAt;
       });
     $("#admin-queue-count").textContent = String(active.length);
+    ($("#queue-clear") as HTMLButtonElement).disabled = active.length === 0;
     const list = $("#admin-queue-list");
 
     if (active.length === 0) {
@@ -278,6 +283,31 @@ async function mountDashboard(root: HTMLElement, slug: string): Promise<void> {
       await refresh();
     } catch (err) {
       showToast(err instanceof Error ? err.message : "설정 변경 실패");
+    } finally {
+      busy = false;
+    }
+  });
+
+  $("#queue-clear").addEventListener("click", async () => {
+    if (busy) return;
+    const count = requests.filter(
+      (r) => r.status === "pending" || r.status === "playing",
+    ).length;
+    if (count === 0) return;
+    if (!window.confirm(`대기열 ${count}곡을 모두 비웁니다. 계속할까요?`)) return;
+
+    busy = true;
+    try {
+      const cleared = await clearQueue(slug);
+      showToast(`대기열 ${cleared}곡을 비웠습니다.`);
+      await refresh();
+    } catch (err) {
+      if (err instanceof AdminAuthError) {
+        clearAdminToken(slug);
+        mountLogin(root, slug, "세션이 만료되었습니다. 다시 로그인해 주세요.");
+        return;
+      }
+      showToast(err instanceof Error ? err.message : "초기화 실패");
     } finally {
       busy = false;
     }

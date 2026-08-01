@@ -76,6 +76,14 @@ export async function patchRequestStatus(
   return data.request;
 }
 
+export async function clearQueue(slug: string): Promise<number> {
+  const data = await adminFetch<{ ok: boolean; cleared: number }>(slug, "/queue/clear", {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+  return data.cleared;
+}
+
 export async function patchAdminSettings(
   slug: string,
   body: { acceptingRequests?: boolean; nowPlayingId?: string | null },

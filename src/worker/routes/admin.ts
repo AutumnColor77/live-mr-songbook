@@ -259,4 +259,28 @@ admin.get("/requests", async (c) => {
   return c.json({ requests: (results ?? []).map(mapRequest) });
 });
 
+// Clears the live queue while keeping request history: active items become
+// 'rejected' rather than 'done' so they are not counted as performed.
+admin.post("/queue/clear", async (c) => {
+  const channelId = c.get("channel").id;
+
+  const active = await c.env.DB.prepare(
+    "SELECT COUNT(*) AS count FROM requests WHERE channel_id = ? AND status IN ('pending', 'playing')",
+  )
+    .bind(channelId)
+    .first<{ count: number }>();
+
+  await c.env.DB.batch([
+    c.env.DB.prepare(
+      "UPDATE requests SET status = 'rejected' WHERE channel_id = ? AND status IN ('pending', 'playing')",
+    ).bind(channelId),
+    c.env.DB.prepare(
+      `INSERT INTO settings (channel_id, key, value) VALUES (?, 'now_playing_id', '')
+       ON CONFLICT(channel_id, key) DO UPDATE SET value = ''`,
+    ).bind(channelId),
+  ]);
+
+  return c.json({ ok: true, cleared: active?.count ?? 0 });
+});
+
 export default admin;

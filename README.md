@@ -66,6 +66,7 @@ npm run dev
 | `GET` | `/api/c/:slug/admin/requests` |
 | `PATCH` | `/api/c/:slug/admin/requests/:id` body `{ status }` |
 | `PATCH` | `/api/c/:slug/admin/settings` body `{ acceptingRequests?, nowPlayingId? }` |
+| `POST` | `/api/c/:slug/admin/queue/clear` — 대기 중·재생 중 신청을 모두 `rejected`로 정리하고 Now Playing 해제 |
 
 ### Platform (`Authorization: Bearer <PLATFORM_ADMIN_TOKEN>`)
 
