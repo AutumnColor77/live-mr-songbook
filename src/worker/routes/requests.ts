@@ -1,0 +1,57 @@
+import { Hono } from "hono";
+import { newId } from "../id";
+import { mapRequest, type Bindings, type SongRow } from "../types";
+
+const requests = new Hono<{ Bindings: Bindings }>();
+
+requests.post("/", async (c) => {
+  const accepting = await c.env.DB.prepare(
+    "SELECT value FROM settings WHERE key = 'accepting_requests'",
+  ).first<{ value: string }>();
+
+  if ((accepting?.value ?? "true") !== "true") {
+    return c.json({ error: "Currently not accepting requests" }, 403);
+  }
+
+  let body: { songId?: string; nickname?: string; comment?: string };
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "Invalid JSON body" }, 400);
+  }
+
+  const songId = typeof body.songId === "string" ? body.songId.trim() : "";
+  if (!songId) {
+    return c.json({ error: "songId is required" }, 400);
+  }
+
+  const song = await c.env.DB.prepare("SELECT * FROM songs WHERE id = ? AND enabled = 1")
+    .bind(songId)
+    .first<SongRow>();
+  if (!song) {
+    return c.json({ error: "Song not found" }, 404);
+  }
+
+  const nicknameRaw = typeof body.nickname === "string" ? body.nickname.trim() : "";
+  const commentRaw = typeof body.comment === "string" ? body.comment.trim() : "";
+  const nickname = nicknameRaw.slice(0, 40) || "익명";
+  const comment = commentRaw.slice(0, 200);
+
+  const id = newId("req");
+  const createdAt = Date.now();
+
+  await c.env.DB.prepare(
+    `INSERT INTO requests (id, song_id, title, artist, nickname, comment, status, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)`,
+  )
+    .bind(id, song.id, song.title, song.artist, nickname, comment, createdAt)
+    .run();
+
+  const row = await c.env.DB.prepare("SELECT * FROM requests WHERE id = ?")
+    .bind(id)
+    .first();
+
+  return c.json({ request: mapRequest(row as never) }, 201);
+});
+
+export default requests;

@@ -1,0 +1,13 @@
+name = "live-mr-songbook"
+compatibility_date = "2025-10-11"
+main = "./src/worker/index.ts"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "live-mr-songbook"
+database_id = "local-dev-placeholder"
+migrations_dir = "migrations"
+
+[assets]
+not_found_handling = "single-page-application"
+binding = "ASSETS"
