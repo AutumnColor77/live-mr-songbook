@@ -10,9 +10,11 @@ Live MR Manager와는 **별도 리포**입니다. 스트리머마다 채널(`slu
 |------|-----|
 | URL | https://live-mr-songbook.boohun2771.workers.dev |
 | 데모 노래책 | https://live-mr-songbook.boohun2771.workers.dev/c/demo |
+| 데모 운영 | https://live-mr-songbook.boohun2771.workers.dev/c/demo/admin |
 | D1 | `live-mr-songbook` (`e2842118-6029-41bc-b309-f8e0a1b8bed1`) |
 
 데모 채널 관리 토큰(시드, 프로덕션에서도 동일 해시): `demo-channel-token`  
+운영 화면(`/c/:slug/admin`)에 위 토큰을 입력하면 됩니다 (탭 `sessionStorage`에만 저장).  
 채널 생성용 `PLATFORM_ADMIN_TOKEN`은 Cloudflare Secret으로만 보관합니다 (`wrangler secret put PLATFORM_ADMIN_TOKEN`).
 
 ## Stack
@@ -34,8 +36,8 @@ npm run dev
 ```
 
 - 홈: http://localhost:5173/
-- 데모: http://localhost:5173/c/demo
-- 데모 채널 admin: `Authorization: Bearer demo-channel-token`
+- 데모 시청자: http://localhost:5173/c/demo
+- 데모 운영: http://localhost:5173/c/demo/admin (토큰 `demo-channel-token`)
 
 ## Multi-tenant model
 
@@ -83,10 +85,11 @@ curl -X POST https://live-mr-songbook.boohun2771.workers.dev/api/platform/channe
   -d "{\"slug\":\"my-stream\",\"name\":\"My Songbook\",\"adminToken\":\"replace-with-long-secret\"}"
 ```
 
-## Viewer features
+## Viewer & streamer UI
 
-- `/c/:slug` 곡 검색·카테고리·신청·대기열·NOW PLAYING
-- `/` 랜딩(데모 링크)
+- `/c/:slug` — 시청자: 검색·카테고리·신청·대기열·NOW PLAYING
+- `/c/:slug/admin` — 스트리머 운영: 신청 on/off, 대기열 재생/완료/거절
+- `/` — 랜딩(데모 시청자·운영 링크)
 - 테마 전환 (다크 / 라이트 / 핑크 / 스카이)
 
 ## Design

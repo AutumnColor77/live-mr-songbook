@@ -1,4 +1,5 @@
 import "./style.css";
+import { mountAdmin } from "./admin";
 import {
   fetchQueue,
   fetchSongs,
@@ -42,11 +43,12 @@ function applyTheme(theme: Theme) {
   });
 }
 
-function parseChannelSlug(): string | null {
-  const match = /^\/c\/([^/]+)\/?$/i.exec(location.pathname);
+function parseChannelPath(): { slug: string; admin: boolean } | null {
+  const match = /^\/c\/([^/]+)(?:\/(admin))?\/?$/i.exec(location.pathname);
   if (!match) return null;
   const slug = match[1]!.toLowerCase();
-  return SLUG_RE.test(slug) ? slug : null;
+  if (!SLUG_RE.test(slug)) return null;
+  return { slug, admin: (match[2] ?? "").toLowerCase() === "admin" };
 }
 
 function mountLanding() {
@@ -78,9 +80,10 @@ function mountLanding() {
             </p>
           </div>
           <a href="/c/demo" class="primary-btn w-full">데모 노래책 열기</a>
+          <a href="/c/demo/admin" class="secondary-btn w-full">데모 운영 화면</a>
           <p class="text-xs text-dim leading-relaxed">
-            시청자용 주소 형식<br />
-            <code class="text-accent">/c/채널슬러그</code>
+            시청자 <code class="text-accent">/c/채널슬러그</code><br />
+            운영 <code class="text-accent">/c/채널슬러그/admin</code>
           </p>
         </div>
       </main>
@@ -535,12 +538,16 @@ async function boot() {
   }
 
   if (location.pathname.startsWith("/c/")) {
-    const slug = parseChannelSlug();
-    if (!slug) {
+    const parsed = parseChannelPath();
+    if (!parsed) {
       mountInvalidSlug();
       return;
     }
-    await mountSongbook(slug);
+    if (parsed.admin) {
+      await mountAdmin(app!, parsed.slug);
+      return;
+    }
+    await mountSongbook(parsed.slug);
     return;
   }
 
