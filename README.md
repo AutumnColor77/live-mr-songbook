@@ -34,8 +34,26 @@ curl -H "Authorization: Bearer dev-admin-token" http://localhost:5173/api/admin/
 
 - 곡 검색 / 카테고리 필터 (KPOP, POP, JPOP, OST)
 - 신청 (닉네임·메시지 선택, 키 선택 없음)
-- NOW PLAYING + 대기열 (모바일: 하단 바·드로어 / 데스크톱: 우측 패널)
+- NOW PLAYING + 대기열 (모바일: 하단 dock·드로어 / 데스크톱: 우측 패널)
 - 상태 폴링 (~5초)
+- 테마 전환 (다크 / 라이트 / 핑크 / 스카이)
+
+## Design
+
+Live MR Manager 데스크톱 앱과 톤앤매너를 맞춥니다. 토큰은 앱의 `src/styles/base.css`에서
+그대로 가져왔고, 앱과 동일한 변수 이름을 씁니다.
+
+| 항목 | 값 |
+|------|-----|
+| 폰트 | SUITE (jsDelivr `sun-typeface/SUITE`) |
+| 배경 | `--bg-color: #08080a` |
+| 글래스 | `--glass-bg` / `--glass-border` |
+| 액센트 | `#3b82f6 → #8b5cf6` 그라디언트 + `--accent-glow` |
+| 컴포넌트 | `.song-card`, `.primary-btn`, `.category-badge`, `.tag-badge`, `.status-badge.mr`, `.search-box`, `.modal-content`, `.dock` |
+| 아이콘 | 앱과 같은 Feather 계열 인라인 SVG (`src/client/icons.ts`) |
+
+테마 4종(`dark`·`light`·`pink`·`sky`)은 앱과 동일한 팔레트이며 `html[data-theme]`로 전환하고
+`localStorage`에 저장합니다.
 
 ## API contract (for Live MR Manager)
 
