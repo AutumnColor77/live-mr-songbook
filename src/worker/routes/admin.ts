@@ -1,22 +1,32 @@
 import { Hono } from "hono";
-import { requireAdmin } from "../auth";
+import { requireChannelAdmin } from "../auth";
 import { newId } from "../id";
-import { mapRequest, mapSong, type Bindings, type RequestRow, type SongRow } from "../types";
+import {
+  mapRequest,
+  mapSong,
+  type AppEnv,
+  type RequestRow,
+  type SongRow,
+} from "../types";
 
-const admin = new Hono<{ Bindings: Bindings }>();
-admin.use("*", requireAdmin);
+const admin = new Hono<AppEnv>();
+admin.use("*", requireChannelAdmin);
 
 const VALID_STATUSES = new Set(["pending", "playing", "done", "rejected"]);
 const VALID_CATEGORIES = new Set(["KPOP", "POP", "JPOP", "OST"]);
 
 admin.get("/songs", async (c) => {
+  const channelId = c.get("channel").id;
   const { results } = await c.env.DB.prepare(
-    "SELECT * FROM songs ORDER BY title COLLATE NOCASE ASC",
-  ).all<SongRow>();
+    "SELECT * FROM songs WHERE channel_id = ? ORDER BY title COLLATE NOCASE ASC",
+  )
+    .bind(channelId)
+    .all<SongRow>();
   return c.json({ songs: (results ?? []).map(mapSong) });
 });
 
 admin.post("/songs", async (c) => {
+  const channelId = c.get("channel").id;
   let body: {
     title?: string;
     artist?: string;
@@ -48,11 +58,12 @@ admin.post("/songs", async (c) => {
   const id = newId("song");
 
   await c.env.DB.prepare(
-    `INSERT INTO songs (id, title, artist, category, tags, song_key, bpm, enabled, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO songs (id, channel_id, title, artist, category, tags, song_key, bpm, enabled, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   )
     .bind(
       id,
+      channelId,
       title,
       artist,
       category,
@@ -72,9 +83,12 @@ admin.post("/songs", async (c) => {
 });
 
 admin.patch("/songs/:id", async (c) => {
+  const channelId = c.get("channel").id;
   const id = c.req.param("id");
-  const existing = await c.env.DB.prepare("SELECT * FROM songs WHERE id = ?")
-    .bind(id)
+  const existing = await c.env.DB.prepare(
+    "SELECT * FROM songs WHERE id = ? AND channel_id = ?",
+  )
+    .bind(id, channelId)
     .first<SongRow>();
   if (!existing) return c.json({ error: "Song not found" }, 404);
 
@@ -110,9 +124,9 @@ admin.patch("/songs/:id", async (c) => {
 
   await c.env.DB.prepare(
     `UPDATE songs SET title = ?, artist = ?, category = ?, tags = ?, song_key = ?, bpm = ?, enabled = ?, updated_at = ?
-     WHERE id = ?`,
+     WHERE id = ? AND channel_id = ?`,
   )
-    .bind(title, artist, category, tags, songKey, bpm, enabled, updatedAt, id)
+    .bind(title, artist, category, tags, songKey, bpm, enabled, updatedAt, id, channelId)
     .run();
 
   const row = await c.env.DB.prepare("SELECT * FROM songs WHERE id = ?")
@@ -122,17 +136,23 @@ admin.patch("/songs/:id", async (c) => {
 });
 
 admin.delete("/songs/:id", async (c) => {
+  const channelId = c.get("channel").id;
   const id = c.req.param("id");
-  const existing = await c.env.DB.prepare("SELECT id FROM songs WHERE id = ?")
-    .bind(id)
+  const existing = await c.env.DB.prepare(
+    "SELECT id FROM songs WHERE id = ? AND channel_id = ?",
+  )
+    .bind(id, channelId)
     .first();
   if (!existing) return c.json({ error: "Song not found" }, 404);
 
-  await c.env.DB.prepare("DELETE FROM songs WHERE id = ?").bind(id).run();
+  await c.env.DB.prepare("DELETE FROM songs WHERE id = ? AND channel_id = ?")
+    .bind(id, channelId)
+    .run();
   return c.json({ ok: true });
 });
 
 admin.patch("/settings", async (c) => {
+  const channelId = c.get("channel").id;
   let body: { acceptingRequests?: boolean; nowPlayingId?: string | null };
   try {
     body = await c.req.json();
@@ -142,23 +162,27 @@ admin.patch("/settings", async (c) => {
 
   if (body.acceptingRequests !== undefined) {
     await c.env.DB.prepare(
-      "INSERT INTO settings (key, value) VALUES ('accepting_requests', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+      `INSERT INTO settings (channel_id, key, value) VALUES (?, 'accepting_requests', ?)
+       ON CONFLICT(channel_id, key) DO UPDATE SET value = excluded.value`,
     )
-      .bind(body.acceptingRequests ? "true" : "false")
+      .bind(channelId, body.acceptingRequests ? "true" : "false")
       .run();
   }
 
   if (body.nowPlayingId !== undefined) {
     const value = body.nowPlayingId ?? "";
     await c.env.DB.prepare(
-      "INSERT INTO settings (key, value) VALUES ('now_playing_id', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+      `INSERT INTO settings (channel_id, key, value) VALUES (?, 'now_playing_id', ?)
+       ON CONFLICT(channel_id, key) DO UPDATE SET value = excluded.value`,
     )
-      .bind(value)
+      .bind(channelId, value)
       .run();
 
     if (value) {
-      await c.env.DB.prepare("UPDATE requests SET status = 'playing' WHERE id = ?")
-        .bind(value)
+      await c.env.DB.prepare(
+        "UPDATE requests SET status = 'playing' WHERE id = ? AND channel_id = ?",
+      )
+        .bind(value, channelId)
         .run();
     }
   }
@@ -167,9 +191,12 @@ admin.patch("/settings", async (c) => {
 });
 
 admin.patch("/requests/:id", async (c) => {
+  const channelId = c.get("channel").id;
   const id = c.req.param("id");
-  const existing = await c.env.DB.prepare("SELECT * FROM requests WHERE id = ?")
-    .bind(id)
+  const existing = await c.env.DB.prepare(
+    "SELECT * FROM requests WHERE id = ? AND channel_id = ?",
+  )
+    .bind(id, channelId)
     .first<RequestRow>();
   if (!existing) return c.json({ error: "Request not found" }, 404);
 
@@ -185,26 +212,34 @@ admin.patch("/requests/:id", async (c) => {
     return c.json({ error: "Invalid status" }, 400);
   }
 
-  await c.env.DB.prepare("UPDATE requests SET status = ? WHERE id = ?")
-    .bind(status, id)
+  await c.env.DB.prepare(
+    "UPDATE requests SET status = ? WHERE id = ? AND channel_id = ?",
+  )
+    .bind(status, id, channelId)
     .run();
 
   if (status === "playing") {
     await c.env.DB.prepare(
-      "INSERT INTO settings (key, value) VALUES ('now_playing_id', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+      `INSERT INTO settings (channel_id, key, value) VALUES (?, 'now_playing_id', ?)
+       ON CONFLICT(channel_id, key) DO UPDATE SET value = excluded.value`,
     )
-      .bind(id)
+      .bind(channelId, id)
       .run();
   }
 
   if (status === "done" || status === "rejected") {
     const current = await c.env.DB.prepare(
-      "SELECT value FROM settings WHERE key = 'now_playing_id'",
-    ).first<{ value: string }>();
+      "SELECT value FROM settings WHERE channel_id = ? AND key = 'now_playing_id'",
+    )
+      .bind(channelId)
+      .first<{ value: string }>();
     if (current?.value === id) {
       await c.env.DB.prepare(
-        "INSERT INTO settings (key, value) VALUES ('now_playing_id', '') ON CONFLICT(key) DO UPDATE SET value = ''",
-      ).run();
+        `INSERT INTO settings (channel_id, key, value) VALUES (?, 'now_playing_id', '')
+         ON CONFLICT(channel_id, key) DO UPDATE SET value = ''`,
+      )
+        .bind(channelId)
+        .run();
     }
   }
 
@@ -215,9 +250,12 @@ admin.patch("/requests/:id", async (c) => {
 });
 
 admin.get("/requests", async (c) => {
+  const channelId = c.get("channel").id;
   const { results } = await c.env.DB.prepare(
-    "SELECT * FROM requests ORDER BY created_at DESC LIMIT 200",
-  ).all<RequestRow>();
+    "SELECT * FROM requests WHERE channel_id = ? ORDER BY created_at DESC LIMIT 200",
+  )
+    .bind(channelId)
+    .all<RequestRow>();
   return c.json({ requests: (results ?? []).map(mapRequest) });
 });
 

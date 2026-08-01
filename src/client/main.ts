@@ -1,5 +1,11 @@
 import "./style.css";
-import { fetchQueue, fetchSongs, fetchStatus, submitRequest } from "./api";
+import {
+  fetchQueue,
+  fetchSongs,
+  fetchStatus,
+  setChannelSlug,
+  submitRequest,
+} from "./api";
 import { $, escapeHtml } from "./dom";
 import { icons } from "./icons";
 import type { Song, SongRequest, StatusResponse } from "./types";
@@ -14,11 +20,107 @@ const THEME_LABELS: Record<Theme, string> = {
   sky: "스카이",
 };
 const THEME_STORAGE_KEY = "songbook-theme";
+const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
 
 const app = document.querySelector<HTMLDivElement>("#app");
 if (!app) throw new Error("#app missing");
 
-app.innerHTML = `
+function currentTheme(): Theme {
+  const stored = localStorage.getItem(THEME_STORAGE_KEY);
+  return THEMES.find((t) => t === stored) ?? "dark";
+}
+
+function logoSrc(theme: Theme): string {
+  return theme === "dark" ? "/logo-on-dark.webp" : "/logo-on-light.webp";
+}
+
+function applyTheme(theme: Theme) {
+  document.documentElement.dataset.theme = theme;
+  localStorage.setItem(THEME_STORAGE_KEY, theme);
+  document.querySelectorAll<HTMLImageElement>("#logo-lockup").forEach((logo) => {
+    logo.src = logoSrc(theme);
+  });
+}
+
+function parseChannelSlug(): string | null {
+  const match = /^\/c\/([^/]+)\/?$/i.exec(location.pathname);
+  if (!match) return null;
+  const slug = match[1]!.toLowerCase();
+  return SLUG_RE.test(slug) ? slug : null;
+}
+
+function mountLanding() {
+  applyTheme(currentTheme());
+  app!.innerHTML = `
+    <div class="relative z-10 min-h-screen flex flex-col">
+      <header class="topbar sticky top-0 z-30">
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
+          <img
+            id="logo-lockup"
+            class="logo-lockup"
+            src="${logoSrc(currentTheme())}"
+            width="480"
+            height="120"
+            alt="Live MR SongBook"
+            fetchpriority="high"
+          />
+          <button id="theme-btn" type="button" class="icon-btn" title="테마 변경" aria-label="테마 변경">
+            ${icons.palette(18)}
+          </button>
+        </div>
+      </header>
+      <main class="flex-1 flex items-center justify-center px-4 py-12">
+        <div class="panel max-w-md w-full p-8 text-center space-y-5">
+          <div>
+            <h1 class="text-xl font-extrabold text-main mb-2">Live MR Songbook</h1>
+            <p class="text-sm font-medium text-muted">
+              스트리머별 노래책 URL로 접속해 신청하세요.
+            </p>
+          </div>
+          <a href="/c/demo" class="primary-btn w-full">데모 노래책 열기</a>
+          <p class="text-xs text-dim leading-relaxed">
+            시청자용 주소 형식<br />
+            <code class="text-accent">/c/채널슬러그</code>
+          </p>
+        </div>
+      </main>
+    </div>
+  `;
+
+  $("#theme-btn").addEventListener("click", () => {
+    const next = THEMES[(THEMES.indexOf(currentTheme()) + 1) % THEMES.length]!;
+    applyTheme(next);
+  });
+}
+
+function mountInvalidSlug() {
+  applyTheme(currentTheme());
+  app!.innerHTML = `
+    <div class="relative z-10 min-h-screen flex items-center justify-center px-4">
+      <div class="panel max-w-md w-full p-8 text-center space-y-4">
+        <h1 class="text-lg font-extrabold text-main">잘못된 채널 주소</h1>
+        <p class="text-sm text-muted">슬러그 형식을 확인해 주세요.</p>
+        <a href="/" class="secondary-btn w-full">홈으로</a>
+      </div>
+    </div>
+  `;
+}
+
+type State = {
+  currentCategory: string;
+  searchQuery: string;
+  songs: Song[];
+  queue: SongRequest[];
+  status: StatusResponse | null;
+  selectedSong: Song | null;
+  submitting: boolean;
+};
+
+async function mountSongbook(slug: string) {
+  setChannelSlug(slug);
+  applyTheme(currentTheme());
+
+  app!.innerHTML = `
   <div class="relative z-10 min-h-screen flex flex-col">
     <header class="topbar sticky top-0 z-30">
       <div class="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
@@ -32,7 +134,10 @@ app.innerHTML = `
             alt="Live MR SongBook"
             fetchpriority="high"
           />
-          <p class="text-xs font-medium text-dim hidden md:block">시청자 신청 · 실시간 대기열</p>
+          <div class="min-w-0 hidden md:block">
+            <p id="channel-name" class="text-sm font-extrabold text-main truncate">…</p>
+            <p class="text-xs font-medium text-dim">/c/${escapeHtml(slug)} · 시청자 신청</p>
+          </div>
         </div>
         <div class="flex items-center gap-2 shrink-0">
           <span id="live-pill" class="live-pill">
@@ -156,235 +261,213 @@ app.innerHTML = `
   </div>
 `;
 
-type State = {
-  currentCategory: string;
-  searchQuery: string;
-  songs: Song[];
-  queue: SongRequest[];
-  status: StatusResponse | null;
-  selectedSong: Song | null;
-  submitting: boolean;
-};
+  const state: State = {
+    currentCategory: "ALL",
+    searchQuery: "",
+    songs: [],
+    queue: [],
+    status: null,
+    selectedSong: null,
+    submitting: false,
+  };
 
-const state: State = {
-  currentCategory: "ALL",
-  searchQuery: "",
-  songs: [],
-  queue: [],
-  status: null,
-  selectedSong: null,
-  submitting: false,
-};
+  let toastTimer: number | undefined;
 
-let toastTimer: number | undefined;
-
-function showToast(message: string) {
-  const toast = $("#toast");
-  toast.textContent = message;
-  toast.hidden = false;
-  window.clearTimeout(toastTimer);
-  toastTimer = window.setTimeout(() => {
-    toast.hidden = true;
-  }, 2400);
-}
-
-function currentTheme(): Theme {
-  const stored = localStorage.getItem(THEME_STORAGE_KEY);
-  return THEMES.find((t) => t === stored) ?? "dark";
-}
-
-function logoSrc(theme: Theme): string {
-  return theme === "dark" ? "/logo-on-dark.webp" : "/logo-on-light.webp";
-}
-
-function applyTheme(theme: Theme) {
-  document.documentElement.dataset.theme = theme;
-  localStorage.setItem(THEME_STORAGE_KEY, theme);
-  const logo = document.querySelector<HTMLImageElement>("#logo-lockup");
-  if (logo) logo.src = logoSrc(theme);
-}
-
-function isAccepting(): boolean {
-  return state.status?.acceptingRequests !== false;
-}
-
-function nowPlayingLabel(): string {
-  const np = state.status?.nowPlaying;
-  return np ? `${np.title} - ${np.artist}` : "현재 재생 중인 곡이 없습니다.";
-}
-
-function songBadges(song: Song): string {
-  const tags = song.tags
-    .map((tag) =>
-      tag.toUpperCase() === "MR"
-        ? `<span class="status-badge mr">MR</span>`
-        : `<span class="tag-badge">${escapeHtml(tag)}</span>`,
-    )
-    .join("");
-  return `<span class="category-badge">${escapeHtml(song.category)}</span>${tags}`;
-}
-
-function renderSongs() {
-  const list = $("#song-list");
-  $("#song-count").textContent = String(state.songs.length);
-
-  if (state.songs.length === 0) {
-    list.innerHTML = `
-      <div class="empty-state">
-        <div class="flex justify-center mb-3 text-dim">${icons.slash(26)}</div>
-        검색 결과가 없습니다.
-      </div>`;
-    return;
+  function showToast(message: string) {
+    const toast = $("#toast");
+    toast.textContent = message;
+    toast.hidden = false;
+    window.clearTimeout(toastTimer);
+    toastTimer = window.setTimeout(() => {
+      toast.hidden = true;
+    }, 2400);
   }
 
-  const accepting = isAccepting();
-
-  list.innerHTML = state.songs
-    .map(
-      (song) => `
-        <div class="song-card">
-          <div class="min-w-0 space-y-1.5">
-            <p class="song-name">${escapeHtml(song.title)}</p>
-            <p class="song-artist">${escapeHtml(song.artist)}</p>
-            <div class="badge-row flex items-center gap-1.5 flex-wrap pt-0.5">${songBadges(song)}</div>
-          </div>
-          <button
-            type="button"
-            class="request-btn primary-btn btn-sm shrink-0"
-            data-song-id="${escapeHtml(song.id)}"
-            ${accepting ? "" : "disabled"}
-          >${icons.mic(15)}신청</button>
-        </div>`,
-    )
-    .join("");
-}
-
-function renderQueueItems(container: HTMLElement, items: SongRequest[]) {
-  const active = items.filter((q) => q.status === "pending" || q.status === "playing");
-
-  if (active.length === 0) {
-    container.innerHTML = `
-      <div class="empty-state" style="padding: 32px 16px">
-        대기 중인 곡이 없습니다.
-      </div>`;
-    return;
+  function isAccepting(): boolean {
+    return state.status?.acceptingRequests !== false;
   }
 
-  container.innerHTML = active
-    .map((item, index) => {
-      const playing =
-        item.status === "playing" ? `<span class="status-badge playing">재생중</span>` : "";
-      const comment = item.comment
-        ? `<p class="text-[11px] font-medium text-dim truncate mt-0.5">${escapeHtml(item.comment)}</p>`
-        : "";
-      return `
-        <div class="queue-row">
-          <span class="queue-index">${index + 1}</span>
-          <div class="min-w-0 flex-1">
-            <div class="flex items-center gap-2 min-w-0">
-              <p class="song-name text-sm">${escapeHtml(item.title)}</p>
-              ${playing}
-            </div>
-            <p class="song-artist text-xs">${escapeHtml(item.artist)} · ${escapeHtml(item.nickname)}</p>
-            ${comment}
-          </div>
+  function nowPlayingLabel(): string {
+    const np = state.status?.nowPlaying;
+    return np ? `${np.title} - ${np.artist}` : "현재 재생 중인 곡이 없습니다.";
+  }
+
+  function songBadges(song: Song): string {
+    const tags = song.tags
+      .map((tag) =>
+        tag.toUpperCase() === "MR"
+          ? `<span class="status-badge mr">MR</span>`
+          : `<span class="tag-badge">${escapeHtml(tag)}</span>`,
+      )
+      .join("");
+    return `<span class="category-badge">${escapeHtml(song.category)}</span>${tags}`;
+  }
+
+  function renderSongs() {
+    const list = $("#song-list");
+    $("#song-count").textContent = String(state.songs.length);
+
+    if (state.songs.length === 0) {
+      list.innerHTML = `
+        <div class="empty-state">
+          <div class="flex justify-center mb-3 text-dim">${icons.slash(26)}</div>
+          검색 결과가 없습니다.
         </div>`;
-    })
-    .join("");
-}
+      return;
+    }
 
-function updateStatusUI() {
-  const accepting = isAccepting();
-  const pending =
-    state.status?.pendingCount ?? state.queue.filter((q) => q.status === "pending").length;
-
-  const pill = $("#live-pill");
-  pill.classList.toggle("is-closed", !accepting);
-  $("#live-pill-text").textContent = accepting ? "신청 가능" : "신청 마감";
-
-  const label = nowPlayingLabel();
-  $("#now-playing-text").textContent = label;
-  $("#aside-now-playing").textContent = label;
-  $("#queue-badge").textContent = String(pending);
-  $("#aside-queue-count").textContent = String(pending);
-
-  renderQueueItems($("#queue-list"), state.queue);
-  renderQueueItems($("#aside-queue-list"), state.queue);
-}
-
-function openRequestModal(songId: string) {
-  const song = state.songs.find((s) => s.id === songId);
-  if (!song) return;
-  if (!isAccepting()) {
-    showToast("지금은 신청을 받지 않습니다.");
-    return;
+    const accepting = isAccepting();
+    list.innerHTML = state.songs
+      .map(
+        (song) => `
+          <div class="song-card">
+            <div class="min-w-0 space-y-1.5">
+              <p class="song-name">${escapeHtml(song.title)}</p>
+              <p class="song-artist">${escapeHtml(song.artist)}</p>
+              <div class="badge-row flex items-center gap-1.5 flex-wrap pt-0.5">${songBadges(song)}</div>
+            </div>
+            <button
+              type="button"
+              class="request-btn primary-btn btn-sm shrink-0"
+              data-song-id="${escapeHtml(song.id)}"
+              ${accepting ? "" : "disabled"}
+            >${icons.mic(15)}신청</button>
+          </div>`,
+      )
+      .join("");
   }
-  state.selectedSong = song;
-  $("#modal-song-title").textContent = song.title;
-  $("#modal-song-artist").textContent = song.artist;
-  ($("#req-nickname") as HTMLInputElement).value = "";
-  ($("#req-comment") as HTMLInputElement).value = "";
-  $("#request-modal").hidden = false;
-}
 
-function closeRequestModal() {
-  $("#request-modal").hidden = true;
-  state.selectedSong = null;
-}
+  function renderQueueItems(container: HTMLElement, items: SongRequest[]) {
+    const active = items.filter((q) => q.status === "pending" || q.status === "playing");
+    if (active.length === 0) {
+      container.innerHTML = `
+        <div class="empty-state" style="padding: 32px 16px">
+          대기 중인 곡이 없습니다.
+        </div>`;
+      return;
+    }
 
-async function handleSubmitRequest() {
-  if (!state.selectedSong || state.submitting) return;
-  state.submitting = true;
-  const btn = $("#submit-request-btn") as HTMLButtonElement;
-  btn.disabled = true;
-  try {
-    const nickname = ($("#req-nickname") as HTMLInputElement).value.trim();
-    const comment = ($("#req-comment") as HTMLInputElement).value.trim();
-    const title = state.selectedSong.title;
-    await submitRequest({
-      songId: state.selectedSong.id,
-      nickname: nickname || undefined,
-      comment: comment || undefined,
-    });
-    closeRequestModal();
-    showToast(`${title} 신청이 완료되었습니다!`);
-    await refreshQueueAndStatus();
-  } catch (err) {
-    showToast(err instanceof Error ? err.message : "신청에 실패했습니다.");
-  } finally {
-    state.submitting = false;
-    btn.disabled = false;
+    container.innerHTML = active
+      .map((item, index) => {
+        const playing =
+          item.status === "playing" ? `<span class="status-badge playing">재생중</span>` : "";
+        const comment = item.comment
+          ? `<p class="text-[11px] font-medium text-dim truncate mt-0.5">${escapeHtml(item.comment)}</p>`
+          : "";
+        return `
+          <div class="queue-row">
+            <span class="queue-index">${index + 1}</span>
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-2 min-w-0">
+                <p class="song-name text-sm">${escapeHtml(item.title)}</p>
+                ${playing}
+              </div>
+              <p class="song-artist text-xs">${escapeHtml(item.artist)} · ${escapeHtml(item.nickname)}</p>
+              ${comment}
+            </div>
+          </div>`;
+      })
+      .join("");
   }
-}
 
-async function refreshSongs() {
-  try {
-    state.songs = await fetchSongs(state.searchQuery, state.currentCategory);
-    $("#sync-label").textContent = "실시간 연동 중";
-    renderSongs();
-  } catch (err) {
-    $("#sync-label").textContent = "연동 오류";
-    console.error(err);
+  function updateStatusUI() {
+    const accepting = isAccepting();
+    const pending =
+      state.status?.pendingCount ?? state.queue.filter((q) => q.status === "pending").length;
+
+    const pill = $("#live-pill");
+    pill.classList.toggle("is-closed", !accepting);
+    $("#live-pill-text").textContent = accepting ? "신청 가능" : "신청 마감";
+
+    const channelName = state.status?.channel?.name ?? slug;
+    $("#channel-name").textContent = channelName;
+    document.title = `${channelName} · Live MR Songbook`;
+
+    const label = nowPlayingLabel();
+    $("#now-playing-text").textContent = label;
+    $("#aside-now-playing").textContent = label;
+    $("#queue-badge").textContent = String(pending);
+    $("#aside-queue-count").textContent = String(pending);
+
+    renderQueueItems($("#queue-list"), state.queue);
+    renderQueueItems($("#aside-queue-list"), state.queue);
   }
-}
 
-async function refreshQueueAndStatus() {
-  try {
-    const [status, queue] = await Promise.all([fetchStatus(), fetchQueue()]);
-    state.status = status;
-    state.queue = queue;
-    updateStatusUI();
-    renderSongs();
-  } catch (err) {
-    console.error(err);
+  function openRequestModal(songId: string) {
+    const song = state.songs.find((s) => s.id === songId);
+    if (!song) return;
+    if (!isAccepting()) {
+      showToast("지금은 신청을 받지 않습니다.");
+      return;
+    }
+    state.selectedSong = song;
+    $("#modal-song-title").textContent = song.title;
+    $("#modal-song-artist").textContent = song.artist;
+    ($("#req-nickname") as HTMLInputElement).value = "";
+    ($("#req-comment") as HTMLInputElement).value = "";
+    $("#request-modal").hidden = false;
   }
-}
 
-function setupEventListeners() {
+  function closeRequestModal() {
+    $("#request-modal").hidden = true;
+    state.selectedSong = null;
+  }
+
+  async function handleSubmitRequest() {
+    if (!state.selectedSong || state.submitting) return;
+    state.submitting = true;
+    const btn = $("#submit-request-btn") as HTMLButtonElement;
+    btn.disabled = true;
+    try {
+      const nickname = ($("#req-nickname") as HTMLInputElement).value.trim();
+      const comment = ($("#req-comment") as HTMLInputElement).value.trim();
+      const title = state.selectedSong.title;
+      await submitRequest({
+        songId: state.selectedSong.id,
+        nickname: nickname || undefined,
+        comment: comment || undefined,
+      });
+      closeRequestModal();
+      showToast(`${title} 신청이 완료되었습니다!`);
+      await refreshQueueAndStatus();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "신청에 실패했습니다.");
+    } finally {
+      state.submitting = false;
+      btn.disabled = false;
+    }
+  }
+
+  async function refreshSongs() {
+    try {
+      state.songs = await fetchSongs(state.searchQuery, state.currentCategory);
+      $("#sync-label").textContent = "실시간 연동 중";
+      renderSongs();
+    } catch (err) {
+      $("#sync-label").textContent = "연동 오류";
+      console.error(err);
+      if (err instanceof Error && err.message.includes("Channel not found")) {
+        showToast("존재하지 않는 채널입니다.");
+      }
+    }
+  }
+
+  async function refreshQueueAndStatus() {
+    try {
+      const [status, queue] = await Promise.all([fetchStatus(), fetchQueue()]);
+      state.status = status;
+      state.queue = queue;
+      updateStatusUI();
+      renderSongs();
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
   const searchInput = $("#search-input") as HTMLInputElement;
   const searchClear = $("#search-clear");
-
   let searchTimer: number | undefined;
+
   searchInput.addEventListener("input", () => {
     state.searchQuery = searchInput.value.trim();
     searchClear.hidden = !searchInput.value;
@@ -440,13 +523,29 @@ function setupEventListeners() {
     closeRequestModal();
     queueModal.hidden = true;
   });
-}
 
-async function init() {
-  applyTheme(currentTheme());
-  setupEventListeners();
   await Promise.all([refreshSongs(), refreshQueueAndStatus()]);
   window.setInterval(() => void refreshQueueAndStatus(), 5000);
 }
 
-void init();
+async function boot() {
+  if (location.pathname === "/" || location.pathname === "") {
+    mountLanding();
+    return;
+  }
+
+  if (location.pathname.startsWith("/c/")) {
+    const slug = parseChannelSlug();
+    if (!slug) {
+      mountInvalidSlug();
+      return;
+    }
+    await mountSongbook(slug);
+    return;
+  }
+
+  // Unknown path → landing
+  mountLanding();
+}
+
+void boot();

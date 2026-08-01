@@ -3,6 +3,7 @@ dist
 .wrangler
 .dev.vars
 .dev.vars.local
+.platform-token.tmp
 *.local
 .DS_Store
 .env

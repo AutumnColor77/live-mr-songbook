@@ -1,11 +1,29 @@
 export type Bindings = {
   DB: D1Database;
-  ADMIN_TOKEN: string;
+  PLATFORM_ADMIN_TOKEN: string;
   ASSETS: Fetcher;
+};
+
+export type ChannelRow = {
+  id: string;
+  slug: string;
+  name: string;
+  admin_token_hash: string;
+  created_at: number;
+};
+
+export type Variables = {
+  channel: ChannelRow;
+};
+
+export type AppEnv = {
+  Bindings: Bindings;
+  Variables: Variables;
 };
 
 export type SongRow = {
   id: string;
+  channel_id: string;
   title: string;
   artist: string;
   category: string;
@@ -19,6 +37,7 @@ export type SongRow = {
 
 export type RequestRow = {
   id: string;
+  channel_id: string;
   song_id: string | null;
   title: string;
   artist: string;

@@ -1,8 +1,19 @@
 # Live MR Songbook
 
-시청자용 노래책 사이트 — Cloudflare Workers (Hono) + D1 + Vite/Tailwind.
+시청자용 멀티채널 노래책 — Cloudflare Workers (Hono) + D1 + Vite/Tailwind.
 
-Live MR Manager와는 **별도 리포**입니다. 멜로밍 API에 의존하지 않으며, 곡·신청 큐는 D1가 단일 소스입니다.
+Live MR Manager와는 **별도 리포**입니다. 스트리머마다 채널(`slug`)이 분리되고, 시청자는 비로그인으로 `/c/:slug`에서 신청합니다.
+
+## Production
+
+| 항목 | 값 |
+|------|-----|
+| URL | https://live-mr-songbook.boohun2771.workers.dev |
+| 데모 노래책 | https://live-mr-songbook.boohun2771.workers.dev/c/demo |
+| D1 | `live-mr-songbook` (`e2842118-6029-41bc-b309-f8e0a1b8bed1`) |
+
+데모 채널 관리 토큰(시드, 프로덕션에서도 동일 해시): `demo-channel-token`  
+채널 생성용 `PLATFORM_ADMIN_TOKEN`은 Cloudflare Secret으로만 보관합니다 (`wrangler secret put PLATFORM_ADMIN_TOKEN`).
 
 ## Stack
 
@@ -17,122 +28,85 @@ Live MR Manager와는 **별도 리포**입니다. 멜로밍 API에 의존하지 
 
 ```bash
 npm install
-cp .dev.vars.example .dev.vars   # ADMIN_TOKEN=dev-admin-token
+cp .dev.vars.example .dev.vars   # PLATFORM_ADMIN_TOKEN=dev-platform-token
 npm run db:migrate:local
 npm run dev
 ```
 
-기본 로컬 URL은 Vite/Wrangler가 안내하는 주소(보통 `http://localhost:5173`)입니다.
+- 홈: http://localhost:5173/
+- 데모: http://localhost:5173/c/demo
+- 데모 채널 admin: `Authorization: Bearer demo-channel-token`
 
-관리 API 예시:
+## Multi-tenant model
+
+- **channels**: `slug`, `name`, `admin_token_hash` (SHA-256)
+- **songs / requests / settings**: `channel_id` 스코프
+- 시청자: 로그인 없음
+- 스트리머: 채널별 Bearer 토큰 (계정 로그인은 이후)
+
+## API
+
+### Public (per channel)
+
+| Method | Path |
+|--------|------|
+| `GET` | `/api/c/:slug/songs?search=&category=` |
+| `GET` | `/api/c/:slug/status` |
+| `GET` | `/api/c/:slug/queue` |
+| `POST` | `/api/c/:slug/requests` body `{ songId, nickname?, comment? }` |
+
+### Channel admin (`Authorization: Bearer <channel_admin_token>`)
+
+| Method | Path |
+|--------|------|
+| `GET/POST` | `/api/c/:slug/admin/songs` |
+| `PATCH/DELETE` | `/api/c/:slug/admin/songs/:id` |
+| `GET` | `/api/c/:slug/admin/requests` |
+| `PATCH` | `/api/c/:slug/admin/requests/:id` body `{ status }` |
+| `PATCH` | `/api/c/:slug/admin/settings` body `{ acceptingRequests?, nowPlayingId? }` |
+
+### Platform (`Authorization: Bearer <PLATFORM_ADMIN_TOKEN>`)
+
+| Method | Path |
+|--------|------|
+| `GET` | `/api/platform/channels` |
+| `POST` | `/api/platform/channels` body `{ slug, name, adminToken }` (`adminToken` ≥ 16 chars) |
+
+레거시 `/api/songs` 등 전역 경로는 **410 Gone**.
+
+채널 생성 예시:
 
 ```bash
-curl -H "Authorization: Bearer dev-admin-token" http://localhost:5173/api/admin/songs
+curl -X POST https://live-mr-songbook.boohun2771.workers.dev/api/platform/channels \
+  -H "Authorization: Bearer <PLATFORM_ADMIN_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d "{\"slug\":\"my-stream\",\"name\":\"My Songbook\",\"adminToken\":\"replace-with-long-secret\"}"
 ```
 
 ## Viewer features
 
-- 곡 검색 / 카테고리 필터 (KPOP, POP, JPOP, OST)
-- 신청 (닉네임·메시지 선택, 키 선택 없음)
-- NOW PLAYING + 대기열 (모바일: 하단 dock·드로어 / 데스크톱: 우측 패널)
-- 상태 폴링 (~5초)
+- `/c/:slug` 곡 검색·카테고리·신청·대기열·NOW PLAYING
+- `/` 랜딩(데모 링크)
 - 테마 전환 (다크 / 라이트 / 핑크 / 스카이)
 
 ## Design
 
-Live MR Manager 데스크톱 앱과 톤앤매너를 맞춥니다. 토큰은 앱의 `src/styles/base.css`에서
-그대로 가져왔고, 앱과 동일한 변수 이름을 씁니다.
+Live MR Manager 톤앤매너 + 브랜드 에셋(`public/icon-*.png`, `logo-on-*.webp`).
 
-| 항목 | 값 |
-|------|-----|
-| 폰트 | SUITE (jsDelivr `sun-typeface/SUITE`) |
-| 배경 | `--bg-color: #08080a` |
-| 글래스 | `--glass-bg` / `--glass-border` |
-| 액센트 | `#3b82f6 → #8b5cf6` 그라디언트 + `--accent-glow` |
-| 컴포넌트 | `.song-card`, `.primary-btn`, `.category-badge`, `.tag-badge`, `.status-badge.mr`, `.search-box`, `.modal-content`, `.dock` |
-| UI 아이콘 | 앱과 같은 Feather 계열 인라인 SVG (`src/client/icons.ts`) |
+## Deploy
 
-### Brand assets
-
-`public/`에 있는 브랜드 이미지는 `Live-MR-Manager_소스/1x/` 원본에서 생성했습니다.
-
-| 파일 | 원본 | 용도 |
-|------|------|------|
-| `icon-32/180/192/512.png` | `대지 1.png` | favicon, apple-touch-icon, 웹 매니페스트 |
-| `logo-on-dark.webp` | `LRMS_연하게.png` | 다크 테마 헤더 로고 |
-| `logo-on-light.webp` | `LRMS_진하게.png` | 라이트·핑크·스카이 테마 헤더 로고 |
-
-아이콘은 정사각 캔버스로 패딩해 왜곡 없이 리사이즈했고, 로고 2종은 동일한 크롭 박스를 써서
-테마를 바꿔도 위치가 흔들리지 않습니다. 헤더 `<img>`의 `src`는 테마에 따라 교체됩니다.
-
-테마 4종(`dark`·`light`·`pink`·`sky`)은 앱과 동일한 팔레트이며 `html[data-theme]`로 전환하고
-`localStorage`에 저장합니다.
-
-## API contract (for Live MR Manager)
-
-### Public
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/api/songs?search=&category=` | Enabled songs |
-| `GET` | `/api/status` | `acceptingRequests`, `nowPlaying`, `pendingCount` |
-| `GET` | `/api/queue` | Pending + playing requests |
-| `POST` | `/api/requests` | Body: `{ songId, nickname?, comment? }` |
-
-### Admin (`Authorization: Bearer <ADMIN_TOKEN>`)
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/api/admin/songs` | All songs (incl. disabled) |
-| `POST` | `/api/admin/songs` | Create song |
-| `PATCH` | `/api/admin/songs/:id` | Update song |
-| `DELETE` | `/api/admin/songs/:id` | Delete song |
-| `GET` | `/api/admin/requests` | Recent requests |
-| `PATCH` | `/api/admin/requests/:id` | Body: `{ status }` — `pending` \| `playing` \| `done` \| `rejected` |
-| `PATCH` | `/api/admin/settings` | Body: `{ acceptingRequests?, nowPlayingId? }` |
-
-Song JSON shape:
-
-```json
-{
-  "id": "song-1",
-  "title": "사건의 지평선",
-  "artist": "윤하",
-  "category": "KPOP",
-  "tags": ["MR", "원키"],
-  "songKey": "A",
-  "bpm": 130,
-  "enabled": true,
-  "createdAt": 1722470400000,
-  "updatedAt": 1722470400000
-}
+```bash
+npx wrangler login
+npx wrangler d1 create live-mr-songbook   # database_id → wrangler.toml
+npx wrangler secret put PLATFORM_ADMIN_TOKEN
+npm run db:migrate:remote
+npm run deploy
 ```
 
-## Deploy (Cloudflare)
+## Out of scope (next)
 
-1. Cloudflare 계정에서 D1 데이터베이스 생성:
-
-   ```bash
-   npx wrangler d1 create live-mr-songbook
-   ```
-
-2. 출력된 `database_id`를 [`wrangler.toml`](wrangler.toml)의 `database_id`에 넣습니다.
-
-3. 시크릿 설정:
-
-   ```bash
-   npx wrangler secret put ADMIN_TOKEN
-   ```
-
-4. 마이그레이션 + 배포:
-
-   ```bash
-   npm run db:migrate:remote
-   npm run deploy
-   ```
-
-## Out of scope (this MVP)
-
-- Live MR Manager ↔ 이 API Push/Pull UI (다음 단계; admin API는 그에 맞춤)
-- WebSocket / Durable Objects 실시간
-- 음원·MR 파일 호스팅
+- 스트리머/시청자 계정 로그인
+- 커스텀 도메인, Companion 링크
+- Live MR Manager Push/Pull
+- Durable Objects / WebSocket
+- 스트리머 관리 대시보드 UI

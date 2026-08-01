@@ -1,13 +1,17 @@
 import { Hono } from "hono";
 import { newId } from "../id";
-import { mapRequest, type Bindings, type SongRow } from "../types";
+import { mapRequest, type AppEnv, type RequestRow, type SongRow } from "../types";
 
-const requests = new Hono<{ Bindings: Bindings }>();
+const requests = new Hono<AppEnv>();
 
 requests.post("/", async (c) => {
+  const channelId = c.get("channel").id;
+
   const accepting = await c.env.DB.prepare(
-    "SELECT value FROM settings WHERE key = 'accepting_requests'",
-  ).first<{ value: string }>();
+    "SELECT value FROM settings WHERE channel_id = ? AND key = 'accepting_requests'",
+  )
+    .bind(channelId)
+    .first<{ value: string }>();
 
   if ((accepting?.value ?? "true") !== "true") {
     return c.json({ error: "Currently not accepting requests" }, 403);
@@ -25,8 +29,10 @@ requests.post("/", async (c) => {
     return c.json({ error: "songId is required" }, 400);
   }
 
-  const song = await c.env.DB.prepare("SELECT * FROM songs WHERE id = ? AND enabled = 1")
-    .bind(songId)
+  const song = await c.env.DB.prepare(
+    "SELECT * FROM songs WHERE id = ? AND channel_id = ? AND enabled = 1",
+  )
+    .bind(songId, channelId)
     .first<SongRow>();
   if (!song) {
     return c.json({ error: "Song not found" }, 404);
@@ -41,17 +47,17 @@ requests.post("/", async (c) => {
   const createdAt = Date.now();
 
   await c.env.DB.prepare(
-    `INSERT INTO requests (id, song_id, title, artist, nickname, comment, status, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)`,
+    `INSERT INTO requests (id, channel_id, song_id, title, artist, nickname, comment, status, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
   )
-    .bind(id, song.id, song.title, song.artist, nickname, comment, createdAt)
+    .bind(id, channelId, song.id, song.title, song.artist, nickname, comment, createdAt)
     .run();
 
   const row = await c.env.DB.prepare("SELECT * FROM requests WHERE id = ?")
     .bind(id)
-    .first();
+    .first<RequestRow>();
 
-  return c.json({ request: mapRequest(row as never) }, 201);
+  return c.json({ request: mapRequest(row!) }, 201);
 });
 
 export default requests;

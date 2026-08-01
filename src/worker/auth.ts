@@ -1,17 +1,48 @@
 import type { Context, Next } from "hono";
-import type { Bindings } from "./types";
+import { bearerToken, sha256Hex, SLUG_RE } from "./crypto";
+import type { AppEnv, ChannelRow } from "./types";
 
-export async function requireAdmin(c: Context<{ Bindings: Bindings }>, next: Next) {
-  const token = c.env.ADMIN_TOKEN;
-  if (!token) {
-    return c.json({ error: "Admin token not configured" }, 500);
+export async function loadChannel(c: Context<AppEnv>, next: Next) {
+  const raw = c.req.param("slug") ?? "";
+  const slug = raw.toLowerCase();
+  if (!SLUG_RE.test(slug)) {
+    return c.json({ error: "Invalid channel slug" }, 400);
   }
 
-  const header = c.req.header("Authorization") ?? "";
-  const match = /^Bearer\s+(.+)$/i.exec(header);
-  const provided = match?.[1]?.trim() ?? "";
+  const channel = await c.env.DB.prepare("SELECT * FROM channels WHERE slug = ?")
+    .bind(slug)
+    .first<ChannelRow>();
 
-  if (!provided || provided !== token) {
+  if (!channel) {
+    return c.json({ error: "Channel not found" }, 404);
+  }
+
+  c.set("channel", channel);
+  await next();
+}
+
+export async function requireChannelAdmin(c: Context<AppEnv>, next: Next) {
+  const provided = bearerToken(c.req.header("Authorization"));
+  if (!provided) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  const hash = await sha256Hex(provided);
+  if (hash !== c.get("channel").admin_token_hash) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  await next();
+}
+
+export async function requirePlatformAdmin(c: Context<AppEnv>, next: Next) {
+  const expected = c.env.PLATFORM_ADMIN_TOKEN;
+  if (!expected) {
+    return c.json({ error: "Platform admin token not configured" }, 500);
+  }
+
+  const provided = bearerToken(c.req.header("Authorization"));
+  if (!provided || provided !== expected) {
     return c.json({ error: "Unauthorized" }, 401);
   }
 
