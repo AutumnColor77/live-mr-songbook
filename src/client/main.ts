@@ -6,7 +6,8 @@ import type { Song, SongRequest, StatusResponse } from "./types";
 
 const CATEGORIES = ["ALL", "KPOP", "POP", "JPOP", "OST"] as const;
 const THEMES = ["dark", "light", "pink", "sky"] as const;
-const THEME_LABELS: Record<(typeof THEMES)[number], string> = {
+type Theme = (typeof THEMES)[number];
+const THEME_LABELS: Record<Theme, string> = {
   dark: "다크",
   light: "라이트",
   pink: "핑크",
@@ -22,14 +23,16 @@ app.innerHTML = `
     <header class="topbar sticky top-0 z-30">
       <div class="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
         <div class="flex items-center gap-3 min-w-0">
-          <span class="logo-icon">${icons.music(20)}</span>
-          <div class="min-w-0">
-            <div class="flex items-center gap-2">
-              <span class="logo-text truncate">LIVE MR SONGBOOK</span>
-              <span class="beta-badge">LIVE</span>
-            </div>
-            <p class="text-xs font-medium text-dim hidden sm:block">시청자 신청 · 실시간 대기열</p>
-          </div>
+          <img
+            id="logo-lockup"
+            class="logo-lockup"
+            src="${logoSrc(currentTheme())}"
+            width="480"
+            height="120"
+            alt="Live MR SongBook"
+            fetchpriority="high"
+          />
+          <p class="text-xs font-medium text-dim hidden md:block">시청자 신청 · 실시간 대기열</p>
         </div>
         <div class="flex items-center gap-2 shrink-0">
           <span id="live-pill" class="live-pill">
@@ -185,14 +188,20 @@ function showToast(message: string) {
   }, 2400);
 }
 
-function currentTheme(): (typeof THEMES)[number] {
+function currentTheme(): Theme {
   const stored = localStorage.getItem(THEME_STORAGE_KEY);
   return THEMES.find((t) => t === stored) ?? "dark";
 }
 
-function applyTheme(theme: (typeof THEMES)[number]) {
+function logoSrc(theme: Theme): string {
+  return theme === "dark" ? "/logo-on-dark.webp" : "/logo-on-light.webp";
+}
+
+function applyTheme(theme: Theme) {
   document.documentElement.dataset.theme = theme;
   localStorage.setItem(THEME_STORAGE_KEY, theme);
+  const logo = document.querySelector<HTMLImageElement>("#logo-lockup");
+  if (logo) logo.src = logoSrc(theme);
 }
 
 function isAccepting(): boolean {

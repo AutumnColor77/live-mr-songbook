@@ -227,41 +227,20 @@ button,
   -webkit-backdrop-filter: blur(20px) saturate(160%);
 }
 
-.logo-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
-  background: var(--accent-gradient);
-  color: var(--text-inverse);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 4px 15px var(--accent-glow);
+/* Brand lockup ships in two artworks (light/dark text); the src is swapped
+   with the theme so the wordmark keeps contrast on every palette. */
+.logo-lockup {
+  height: 34px;
+  width: auto;
+  aspect-ratio: 4 / 1;
+  display: block;
   flex-shrink: 0;
 }
 
-.logo-text {
-  font-size: 1.15rem;
-  font-weight: 900;
-  line-height: 1.1;
-  letter-spacing: -0.5px;
-  background: linear-gradient(to right, var(--text-main), var(--text-dim));
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-
-.beta-badge {
-  background: var(--accent-gradient);
-  color: var(--text-inverse);
-  font-size: 0.6rem;
-  font-weight: 900;
-  padding: 2px 7px;
-  border-radius: 4px;
-  letter-spacing: 0.5px;
-  box-shadow: 0 0 10px rgb(var(--accent-rgb) / 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  flex-shrink: 0;
+@media (min-width: 640px) {
+  .logo-lockup {
+    height: 40px;
+  }
 }
 
 .live-pill {

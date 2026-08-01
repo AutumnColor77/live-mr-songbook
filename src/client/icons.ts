@@ -7,8 +7,6 @@ function svg(paths: string, size = 18, fill = false): string {
 }
 
 export const icons = {
-  music: (size = 18) =>
-    svg('<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>', size),
   search: (size = 18) =>
     svg('<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>', size),
   close: (size = 18) => svg('<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>', size),

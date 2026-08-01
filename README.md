@@ -50,7 +50,20 @@ Live MR Manager 데스크톱 앱과 톤앤매너를 맞춥니다. 토큰은 앱�
 | 글래스 | `--glass-bg` / `--glass-border` |
 | 액센트 | `#3b82f6 → #8b5cf6` 그라디언트 + `--accent-glow` |
 | 컴포넌트 | `.song-card`, `.primary-btn`, `.category-badge`, `.tag-badge`, `.status-badge.mr`, `.search-box`, `.modal-content`, `.dock` |
-| 아이콘 | 앱과 같은 Feather 계열 인라인 SVG (`src/client/icons.ts`) |
+| UI 아이콘 | 앱과 같은 Feather 계열 인라인 SVG (`src/client/icons.ts`) |
+
+### Brand assets
+
+`public/`에 있는 브랜드 이미지는 `Live-MR-Manager_소스/1x/` 원본에서 생성했습니다.
+
+| 파일 | 원본 | 용도 |
+|------|------|------|
+| `icon-32/180/192/512.png` | `대지 1.png` | favicon, apple-touch-icon, 웹 매니페스트 |
+| `logo-on-dark.webp` | `LRMS_연하게.png` | 다크 테마 헤더 로고 |
+| `logo-on-light.webp` | `LRMS_진하게.png` | 라이트·핑크·스카이 테마 헤더 로고 |
+
+아이콘은 정사각 캔버스로 패딩해 왜곡 없이 리사이즈했고, 로고 2종은 동일한 크롭 박스를 써서
+테마를 바꿔도 위치가 흔들리지 않습니다. 헤더 `<img>`의 `src`는 테마에 따라 교체됩니다.
 
 테마 4종(`dark`·`light`·`pink`·`sky`)은 앱과 동일한 팔레트이며 `html[data-theme]`로 전환하고
 `localStorage`에 저장합니다.
