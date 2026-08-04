@@ -6,6 +6,60 @@ import type { AppEnv, ChannelRow } from "../types";
 
 const RESERVED_SLUGS = new Set(["demo", "me", "api", "admin", "c"]);
 
+function slugifyName(name: string): string {
+  return name
+    .trim()
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40);
+}
+
+function shortSuffix(): string {
+  const buf = new Uint8Array(3);
+  crypto.getRandomValues(buf);
+  return [...buf]
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("")
+    .slice(0, 5);
+}
+
+async function allocateSlug(
+  db: D1Database,
+  preferred: string,
+  name: string,
+): Promise<string | null> {
+  const fromName = slugifyName(name);
+  let base =
+    preferred && SLUG_RE.test(preferred) && !RESERVED_SLUGS.has(preferred)
+      ? preferred
+      : fromName && SLUG_RE.test(fromName) && !RESERVED_SLUGS.has(fromName)
+        ? fromName
+        : `ch-${shortSuffix()}`;
+
+  if (!SLUG_RE.test(base) || RESERVED_SLUGS.has(base)) {
+    base = `ch-${shortSuffix()}`;
+  }
+
+  for (let i = 0; i < 24; i++) {
+    const candidate =
+      i === 0
+        ? base
+        : i < 8
+          ? `${base.slice(0, 55)}-${i + 1}`
+          : `${(fromName || "ch").slice(0, 50)}-${shortSuffix()}`;
+    if (!SLUG_RE.test(candidate) || RESERVED_SLUGS.has(candidate)) continue;
+    const existing = await db
+      .prepare("SELECT id FROM channels WHERE slug = ?")
+      .bind(candidate)
+      .first();
+    if (!existing) return candidate;
+  }
+  return null;
+}
+
 const me = new Hono<AppEnv>();
 
 me.post("/channels", async (c) => {
@@ -19,27 +73,26 @@ me.post("/channels", async (c) => {
     return c.json({ error: "Invalid JSON body" }, 400);
   }
 
-  const slug = typeof body.slug === "string" ? body.slug.trim().toLowerCase() : "";
+  const preferred =
+    typeof body.slug === "string" ? body.slug.trim().toLowerCase() : "";
   const name = typeof body.name === "string" ? body.name.trim() : "";
 
-  if (!SLUG_RE.test(slug)) {
+  if (!name || name.length > 80) {
+    return c.json({ error: "채널 이름(최대 80자)을 입력해 주세요." }, 400);
+  }
+  if (preferred && (!SLUG_RE.test(preferred) || RESERVED_SLUGS.has(preferred))) {
     return c.json(
       { error: "슬러그는 영문 소문자·숫자·하이픈만 가능합니다 (1–63자)." },
       400,
     );
   }
-  if (RESERVED_SLUGS.has(slug)) {
-    return c.json({ error: "사용할 수 없는 슬러그입니다." }, 400);
-  }
-  if (!name || name.length > 80) {
-    return c.json({ error: "채널 이름(최대 80자)을 입력해 주세요." }, 400);
-  }
 
-  const existing = await c.env.DB.prepare("SELECT id FROM channels WHERE slug = ?")
-    .bind(slug)
-    .first();
-  if (existing) {
-    return c.json({ error: "이미 사용 중인 슬러그입니다." }, 409);
+  const slug = await allocateSlug(c.env.DB, preferred, name);
+  if (!slug) {
+    return c.json(
+      { error: "사용 가능한 URL을 만들지 못했습니다. 다시 시도해 주세요." },
+      409,
+    );
   }
 
   const id = newId("ch");

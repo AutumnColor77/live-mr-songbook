@@ -71,15 +71,18 @@ export async function fetchMe(): Promise<AuthUser | null> {
 }
 
 export async function createChannel(input: {
-  slug: string;
   name: string;
+  slug?: string;
 }): Promise<UserChannel> {
   const data = await fetchJson<{
     channel: UserChannel & { createdAt?: number };
   }>("/api/me/channels", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input),
+    body: JSON.stringify({
+      name: input.name,
+      ...(input.slug?.trim() ? { slug: input.slug.trim() } : {}),
+    }),
   });
   if (!data.channel?.slug) throw new Error("채널 생성에 실패했습니다.");
   return {
