@@ -2,7 +2,9 @@
 
 시청자용 멀티채널 노래책 — Cloudflare Workers (Hono) + D1 + Vite/Tailwind.
 
-Live MR Manager와는 **별도 리포**입니다. 스트리머마다 채널(`slug`)이 분리되고, 시청자는 비로그인으로 `/c/:slug`에서 신청합니다.
+Live MR Manager와는 **별도 리포**입니다. 스트리머는 소셜 로그인으로 본인 채널을 만들고, Manager 앱에서 라이브러리를 **Push** 동기화합니다. 시청자는 비로그인으로 `/c/:slug`에서 곡을 검색·신청합니다.
+
+로드맵·미완 작업은 [`TODO.md`](TODO.md)를 보세요.
 
 ## Production
 
@@ -13,9 +15,11 @@ Live MR Manager와는 **별도 리포**입니다. 스트리머마다 채널(`slu
 | 데모 운영 | https://live-mr-songbook.boohun2771.workers.dev/c/demo/admin |
 | D1 | `live-mr-songbook` (`e2842118-6029-41bc-b309-f8e0a1b8bed1`) |
 
-데모 채널 관리 토큰(시드, 프로덕션에서도 동일 해시): `demo-channel-token`  
-운영 화면(`/c/:slug/admin`)에 위 토큰을 입력하면 됩니다 (탭 `sessionStorage`에만 저장).  
-채널 생성용 `PLATFORM_ADMIN_TOKEN`은 Cloudflare Secret으로만 보관합니다 (`wrangler secret put PLATFORM_ADMIN_TOKEN`).
+시크릿은 Cloudflare Secret으로만 보관합니다 (`wrangler secret put …`).  
+채널 **운영 권한의 기본**은 OAuth 세션 + `channel_members`입니다. 채널 Admin Token은 API 폴백·플랫폼 생성용입니다.
+
+데모 채널 시드 토큰(로컬/시드와 동일 해시): `demo-channel-token`  
+(데모 운영 화면에서 토큰 입력이 남아 있는 경우 위 값을 사용합니다.)
 
 ## Stack
 
@@ -30,64 +34,84 @@ Live MR Manager와는 **별도 리포**입니다. 스트리머마다 채널(`slu
 
 ```bash
 npm install
-cp .dev.vars.example .dev.vars   # PLATFORM_ADMIN_TOKEN + (optional) Google OAuth
+cp .dev.vars.example .dev.vars   # PLATFORM_ADMIN_TOKEN + Google/Naver OAuth
 npm run db:migrate:local
 npm run dev
 ```
 
-- 홈: http://localhost:5173/ (Google 로그인)
+- 홈: http://localhost:5173/
+- 계정·채널: http://localhost:5173/me
 - 데모 시청자: http://localhost:5173/c/demo
-- 데모 운영: http://localhost:5173/c/demo/admin (토큰 `demo-channel-token`)
+- 데모 운영: http://localhost:5173/c/demo/admin
 
-### Google OAuth 설정
+## OAuth (Google / Naver)
 
-1. [Google Cloud Console](https://console.cloud.google.com/apis/credentials)에서 OAuth 2.0 클라이언트(웹) 생성
-2. 승인된 리디렉션 URI 추가:
-   - 로컬: `http://localhost:5173/api/auth/google/callback`
-   - 프로덕션: `https://live-mr-songbook.boohun2771.workers.dev/api/auth/google/callback`
-3. `.dev.vars`에 `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` 입력
-4. 프로덕션은 시크릿으로 등록:
+1. 각 콘솔에서 웹 클라이언트 생성 후 콜백 URI 등록  
+   - 로컬 Google: `http://localhost:5173/api/auth/google/callback`  
+   - 로컬 Naver: `http://localhost:5173/api/auth/naver/callback`  
+   - 프로덕션: `https://live-mr-songbook.boohun2771.workers.dev/api/auth/{google|naver}/callback`
+2. `.dev.vars`에 클라이언트 ID/Secret 입력 (네이버는 이메일 등 필수 제공 허용)
+3. 프로덕션 시크릿:
 
 ```bash
+npx wrangler secret put PLATFORM_ADMIN_TOKEN
 npx wrangler secret put GOOGLE_CLIENT_ID
 npx wrangler secret put GOOGLE_CLIENT_SECRET
+npx wrangler secret put NAVER_CLIENT_ID
+npx wrangler secret put NAVER_CLIENT_SECRET
 ```
 
-값이 비어 있으면 홈의 Google 로그인 버튼은 503을 반환합니다.
+설정이 비어 있으면 해당 로그인 버튼은 사용할 수 없습니다 (`GET /api/auth/status`).
+
+**데스크톱(Manager)** deep-link: `live-mr-manager://oauth/callback?token=…`  
+브라우저 세션 재사용: `GET /api/auth/desktop-connect`, 핸드오프: `GET /api/auth/desktop-handoff`.
 
 ## Multi-tenant model
 
-- **channels**: `slug`, `name`, `admin_token_hash` (SHA-256)
-- **songs / requests / settings**: `channel_id` 스코프
-- **users / sessions**: Google 계정 로그인 (HttpOnly 쿠키 세션)
-- 시청자: 로그인 없음
-- 스트리머: Google 로그인 → 데모 채널 운영 (`/c/demo/admin`). 채널 Admin Token은 API 폴백용
-- 로그인 성공 기본 이동: `/c/demo/admin`
+- **channels** — `slug`, `name`, `admin_token_hash`
+- **channel_members** — 사용자↔채널 역할(`admin` 등). 로그인 사용자는 **본인 채널 1개**(demo 제외)
+- **songs** — `title`, `artist`, `category`(큐레이션), `genre`, `tags`, `song_key`, `bpm`, `difficulty`(1–5), `thumbnail`(http(s) 또는 압축 data URL), `enabled`
+- **requests / settings** — 채널 스코프 대기열·신청 수락·Now Playing
+- **users / sessions** — Google/Naver 계정, HttpOnly `sb_session` 쿠키
+- 시청자: 로그인 없음  
+- 스트리머: 소셜 로그인 → 프로필 설정(`/me/setup`) → **`/me`**에서 채널 생성·이름/슬러그 수정 → `/c/:slug/admin` 운영  
+- 로그인 성공 기본 next: `/me` (데모는 보조 CTA)
 
 ## API
 
-### Auth (Google)
+### Auth
 
 | Method | Path | 설명 |
 |--------|------|------|
-| `GET` | `/api/auth/google` | Google OAuth 시작 (리다이렉트) |
-| `GET` | `/api/auth/google/callback` | OAuth 콜백 → 세션 쿠키 발급 |
-| `GET` | `/api/auth/me` | 현재 로그인 사용자 + 소속 채널 (`{ user, channels }`) |
-| `GET` | `/api/auth/desktop-connect` | 앱 로그인 진입 — 브라우저 세션 재사용 또는 OAuth (`?provider=&next=`) |
-| `GET` | `/api/auth/desktop-handoff` | 기존 세션 → 앱 deep-link 토큰 |
-| `GET` | `/api/auth/status` | `{ googleEnabled }` — OAuth 설정 여부 |
+| `GET` | `/api/auth/{google\|naver}` | OAuth 시작 |
+| `GET` | `/api/auth/{google\|naver}/callback` | 콜백 → 세션 쿠키 |
+| `POST` | `/api/auth/{google\|naver}/exchange` | SPA code 교환 |
+| `GET` | `/api/auth/me` | `{ user, channels }` |
+| `PATCH` | `/api/auth/profile` | 닉네임·아바타 |
+| `GET` | `/api/auth/desktop-connect` | 앱 로그인 (`?provider=&next=`) |
+| `GET` | `/api/auth/desktop-handoff` | 세션 → deep-link 토큰 |
+| `GET` | `/api/auth/status` | `{ googleEnabled, naverEnabled }` |
 | `POST` | `/api/auth/logout` | 세션 삭제 |
+
+### Me (세션 필수)
+
+| Method | Path | 설명 |
+|--------|------|------|
+| `POST` | `/api/me/channels` | 채널 생성 `{ name, slug? }` (계정당 1개) |
+| `PATCH` | `/api/me/channels/:id` | 이름·슬러그 수정 |
 
 ### Public (per channel)
 
 | Method | Path |
 |--------|------|
-| `GET` | `/api/c/:slug/songs?search=&category=` |
+| `GET` | `/api/c/:slug/songs?search=&genre=&artist=` → `{ songs, genres, artists }` |
 | `GET` | `/api/c/:slug/status` |
 | `GET` | `/api/c/:slug/queue` |
 | `POST` | `/api/c/:slug/requests` body `{ songId, nickname?, comment? }` |
 
-### Channel admin (`Authorization: Bearer <channel_admin_token>`)
+### Channel admin
+
+`Authorization: Bearer <session_token | channel_admin_token>` (쿠키 세션 또는 멤버십/토큰)
 
 | Method | Path |
 |--------|------|
@@ -96,7 +120,7 @@ npx wrangler secret put GOOGLE_CLIENT_SECRET
 | `GET` | `/api/c/:slug/admin/requests` |
 | `PATCH` | `/api/c/:slug/admin/requests/:id` body `{ status }` |
 | `PATCH` | `/api/c/:slug/admin/settings` body `{ acceptingRequests?, nowPlayingId? }` |
-| `POST` | `/api/c/:slug/admin/queue/clear` — 대기 중·재생 중 신청을 모두 `rejected`로 정리하고 Now Playing 해제 |
+| `POST` | `/api/c/:slug/admin/queue/clear` |
 
 ### Platform (`Authorization: Bearer <PLATFORM_ADMIN_TOKEN>`)
 
@@ -105,24 +129,27 @@ npx wrangler secret put GOOGLE_CLIENT_SECRET
 | `GET` | `/api/platform/channels` |
 | `POST` | `/api/platform/channels` body `{ slug, name, adminToken }` (`adminToken` ≥ 16 chars) |
 
-레거시 `/api/songs` 등 전역 경로는 **410 Gone**.
-
-채널 생성 예시:
-
-```bash
-curl -X POST https://live-mr-songbook.boohun2771.workers.dev/api/platform/channels \
-  -H "Authorization: Bearer <PLATFORM_ADMIN_TOKEN>" \
-  -H "Content-Type: application/json" \
-  -d "{\"slug\":\"my-stream\",\"name\":\"My Songbook\",\"adminToken\":\"replace-with-long-secret\"}"
-```
+레거시 전역 `/api/songs` 등은 **410 Gone**.
 
 ## Viewer & streamer UI
 
-- `/c/:slug` — 시청자: 검색·카테고리·신청·대기열·NOW PLAYING
-- `/c/:slug/admin` — 스트리머 운영: 신청 on/off, 대기열 재생/완료/거절
-- `/` — 랜딩(Google 로그인, 데모 링크)
-- `/me` — 로그인 후 계정 화면 (다음 단계 CTA)
-- 테마 전환 (다크 / 라이트 / 핑크 / 스카이)
+- `/` — 랜딩, 소셜 로그인, 데모·내 채널 CTA
+- `/me/setup` — 최초 프로필(닉네임·아바타)
+- `/me` — 채널 생성/수정(표시 이름·슬러그), 프로필 편집
+- `/c/:slug` — 시청자: 검색, 접이식 **장르·가수** 필터, 리스트/버튼 모드, 썸네일·난이도, 신청·대기열·Now Playing
+- `/c/:slug/admin` — 운영: 신청 on/off, 대기열 재생/완료/거절·비우기
+- 테마: 다크 / 라이트 / 핑크 / 스카이
+
+## Live MR Manager 연동
+
+Manager 앱에서 Songbook에 로그인한 뒤 라이브러리를 채널로 **Push**합니다.
+
+- 본인 채널만 대상(demo 차단). 없으면 `/api/me/channels`로 생성 유도
+- 곡 메타: 제목·아티스트·장르·카테고리·태그·키·BPM·난이도·썸네일
+- 썸네일: `http(s)` URL 유지, 로컬 이미지는 JPEG data URL로 압축 업로드
+- 기존 곡은 title+artist 키로 PATCH
+
+구현 위치(Manager 리포): `src/js/songbook-sync.js`, `songbook-thumbnail.js`, 데스크톱 OAuth/세션 스토어.
 
 ## Design
 
@@ -132,7 +159,7 @@ Live MR Manager 톤앤매너 + 브랜드 에셋(`public/icon-*.png`, `logo-on-*.
 
 ```bash
 npx wrangler login
-npx wrangler d1 create live-mr-songbook   # database_id → wrangler.toml
+npx wrangler d1 create live-mr-songbook   # database_id → wrangler.toml (최초 1회)
 npx wrangler secret put PLATFORM_ADMIN_TOKEN
 npx wrangler secret put GOOGLE_CLIENT_ID
 npx wrangler secret put GOOGLE_CLIENT_SECRET
@@ -144,15 +171,6 @@ npm run deploy
 
 프로덕션 콜백 URL을 Google/네이버 콘솔에 등록하세요.
 
-- `https://<worker>.workers.dev/api/auth/google/callback`
-- `https://<worker>.workers.dev/api/auth/naver/callback`
+## Roadmap
 
-## Out of scope (next)
-
-- 채널별 소유권 UI (비-demo 채널 멤버 초대)
-- Manager 앱 내 deep-link 세션 동기화
-- 시청자 계정 로그인
-- 커스텀 도메인, Companion 링크
-- Live MR Manager Push/Pull
-- Durable Objects / WebSocket
-- 스트리머 관리 대시보드 UI
+향후 작업·체크리스트는 [`TODO.md`](TODO.md)를 참고하세요.

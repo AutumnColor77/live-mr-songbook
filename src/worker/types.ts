@@ -60,9 +60,12 @@ export type SongRow = {
   title: string;
   artist: string;
   category: string;
+  genre: string;
   tags: string;
   song_key: string | null;
   bpm: number | null;
+  difficulty: number | null;
+  thumbnail: string;
   enabled: number;
   created_at: number;
   updated_at: number;
@@ -85,13 +88,42 @@ export type Song = {
   title: string;
   artist: string;
   category: string;
+  genre: string;
   tags: string[];
   songKey: string | null;
   bpm: number | null;
+  difficulty: number | null;
+  thumbnail: string;
   enabled: boolean;
   createdAt: number;
   updatedAt: number;
 };
+
+/** Max JPEG data-URL length from Manager prepareSongbookThumbnail (~80KB text). */
+export const SONG_THUMBNAIL_MAX_DATA_URL_CHARS = 80_000;
+const MAX_HTTP_THUMBNAIL_CHARS = 2048;
+
+/** http(s) URL or compact data:image/*; local paths rejected */
+export function normalizeThumbnail(raw: unknown): string {
+  if (typeof raw !== "string") return "";
+  const value = raw.trim();
+  if (!value) return "";
+
+  if (value.startsWith("data:image/")) {
+    if (value.length > SONG_THUMBNAIL_MAX_DATA_URL_CHARS) return "";
+    if (!/^data:image\/[a-zA-Z0-9.+-]+;base64,/i.test(value)) return "";
+    return value;
+  }
+
+  if (value.length > MAX_HTTP_THUMBNAIL_CHARS) return "";
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return "";
+    return value;
+  } catch {
+    return "";
+  }
+}
 
 export type SongRequest = {
   id: string;
@@ -116,10 +148,16 @@ export function mapSong(row: SongRow): Song {
     id: row.id,
     title: row.title,
     artist: row.artist,
-    category: row.category,
+    category: row.category ?? "",
+    genre: row.genre ?? "",
     tags,
     songKey: row.song_key,
     bpm: row.bpm,
+    difficulty:
+      typeof row.difficulty === "number" && row.difficulty >= 1 && row.difficulty <= 5
+        ? row.difficulty
+        : null,
+    thumbnail: row.thumbnail ?? "",
     enabled: row.enabled === 1,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

@@ -10,12 +10,17 @@ export const icons = {
   search: (size = 18) =>
     svg('<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>', size),
   close: (size = 18) => svg('<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>', size),
+  chevronDown: (size = 18) => svg('<polyline points="6 9 12 15 18 9"/>', size),
   disc: (size = 18) => svg('<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/>', size),
   list: (size = 18) =>
     svg(
       '<line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>',
       size,
     ),
+  viewList: (size = 18) =>
+    `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="currentColor" aria-hidden="true"><path d="M4 6h2v2H4V6zm5 0h11v2H9V6zm-5 5h2v2H4v-2zm5 0h11v2H9v-2zm-5 5h2v2H4v-2zm5 0h11v2H9v-2z"/></svg>`,
+  viewButton: (size = 18) =>
+    `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="currentColor" aria-hidden="true"><path d="M3 4h8v6H3V4zm10 0h8v6h-8V4zm0 10h8v6h-8v-6zM3 14h8v6H3v-6z"/></svg>`,
   mic: (size = 18) =>
     svg(
       '<path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>',

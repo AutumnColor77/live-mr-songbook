@@ -4,6 +4,7 @@ import { newId } from "../id";
 import {
   mapRequest,
   mapSong,
+  normalizeThumbnail,
   type AppEnv,
   type RequestRow,
   type SongRow,
@@ -13,7 +14,27 @@ const admin = new Hono<AppEnv>();
 admin.use("*", requireChannelAdmin);
 
 const VALID_STATUSES = new Set(["pending", "playing", "done", "rejected"]);
-const VALID_CATEGORIES = new Set(["KPOP", "POP", "JPOP", "OST"]);
+
+function normalizeCategory(raw: unknown, fallback = ""): string {
+  if (typeof raw !== "string") return fallback;
+  const value = raw.trim().slice(0, 40);
+  return value || fallback;
+}
+
+function normalizeGenre(raw: unknown, fallback = "미분류"): string {
+  if (typeof raw !== "string") return fallback;
+  const value = raw.trim().slice(0, 40);
+  return value || fallback;
+}
+
+function normalizeDifficulty(raw: unknown): number | null {
+  if (raw == null || raw === "") return null;
+  const n = typeof raw === "number" ? raw : Number(raw);
+  if (!Number.isFinite(n)) return null;
+  const rounded = Math.round(n);
+  if (rounded < 1 || rounded > 5) return null;
+  return rounded;
+}
 
 admin.get("/songs", async (c) => {
   const channelId = c.get("channel").id;
@@ -31,9 +52,12 @@ admin.post("/songs", async (c) => {
     title?: string;
     artist?: string;
     category?: string;
+    genre?: string;
     tags?: string[];
     songKey?: string | null;
     bpm?: number | null;
+    difficulty?: number | null;
+    thumbnail?: string | null;
     enabled?: boolean;
   };
   try {
@@ -48,18 +72,17 @@ admin.post("/songs", async (c) => {
     return c.json({ error: "title and artist are required" }, 400);
   }
 
-  const category = (body.category ?? "KPOP").toUpperCase();
-  if (!VALID_CATEGORIES.has(category)) {
-    return c.json({ error: "Invalid category" }, 400);
-  }
-
+  const category = normalizeCategory(body.category);
+  const genre = normalizeGenre(body.genre);
+  const difficulty = normalizeDifficulty(body.difficulty);
   const tags = Array.isArray(body.tags) ? body.tags.map(String) : [];
+  const thumbnail = normalizeThumbnail(body.thumbnail);
   const now = Date.now();
   const id = newId("song");
 
   await c.env.DB.prepare(
-    `INSERT INTO songs (id, channel_id, title, artist, category, tags, song_key, bpm, enabled, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO songs (id, channel_id, title, artist, category, genre, tags, song_key, bpm, difficulty, thumbnail, enabled, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   )
     .bind(
       id,
@@ -67,9 +90,12 @@ admin.post("/songs", async (c) => {
       title,
       artist,
       category,
+      genre,
       JSON.stringify(tags),
       body.songKey ?? null,
       body.bpm ?? null,
+      difficulty,
+      thumbnail,
       body.enabled === false ? 0 : 1,
       now,
       now,
@@ -96,9 +122,12 @@ admin.patch("/songs/:id", async (c) => {
     title: string;
     artist: string;
     category: string;
+    genre: string;
     tags: string[];
     songKey: string | null;
     bpm: number | null;
+    difficulty: number | null;
+    thumbnail: string | null;
     enabled: boolean;
   }>;
   try {
@@ -110,23 +139,48 @@ admin.patch("/songs/:id", async (c) => {
   const title = body.title !== undefined ? String(body.title).trim() : existing.title;
   const artist = body.artist !== undefined ? String(body.artist).trim() : existing.artist;
   const category =
-    body.category !== undefined ? String(body.category).toUpperCase() : existing.category;
-  if (!VALID_CATEGORIES.has(category)) {
-    return c.json({ error: "Invalid category" }, 400);
-  }
+    body.category !== undefined
+      ? normalizeCategory(body.category, existing.category || "")
+      : existing.category;
+  const genre =
+    body.genre !== undefined
+      ? normalizeGenre(body.genre, existing.genre || "미분류")
+      : (existing.genre ?? "");
   const tags =
     body.tags !== undefined ? JSON.stringify(body.tags.map(String)) : existing.tags;
   const songKey = body.songKey !== undefined ? body.songKey : existing.song_key;
   const bpm = body.bpm !== undefined ? body.bpm : existing.bpm;
+  const difficulty =
+    body.difficulty !== undefined
+      ? normalizeDifficulty(body.difficulty)
+      : (existing.difficulty ?? null);
+  const thumbnail =
+    body.thumbnail !== undefined
+      ? normalizeThumbnail(body.thumbnail)
+      : (existing.thumbnail ?? "");
   const enabled =
     body.enabled !== undefined ? (body.enabled ? 1 : 0) : existing.enabled;
   const updatedAt = Date.now();
 
   await c.env.DB.prepare(
-    `UPDATE songs SET title = ?, artist = ?, category = ?, tags = ?, song_key = ?, bpm = ?, enabled = ?, updated_at = ?
+    `UPDATE songs SET title = ?, artist = ?, category = ?, genre = ?, tags = ?, song_key = ?, bpm = ?, difficulty = ?, thumbnail = ?, enabled = ?, updated_at = ?
      WHERE id = ? AND channel_id = ?`,
   )
-    .bind(title, artist, category, tags, songKey, bpm, enabled, updatedAt, id, channelId)
+    .bind(
+      title,
+      artist,
+      category,
+      genre,
+      tags,
+      songKey,
+      bpm,
+      difficulty,
+      thumbnail,
+      enabled,
+      updatedAt,
+      id,
+      channelId,
+    )
     .run();
 
   const row = await c.env.DB.prepare("SELECT * FROM songs WHERE id = ?")

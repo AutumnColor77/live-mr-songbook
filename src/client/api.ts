@@ -24,13 +24,32 @@ async function getJson<T>(url: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-export async function fetchSongs(search: string, category: string): Promise<Song[]> {
+export async function fetchSongs(
+  search: string,
+  genre: string,
+  artist = "ALL",
+): Promise<{ songs: Song[]; genres: string[]; artists: string[] }> {
   const params = new URLSearchParams();
   if (search) params.set("search", search);
-  if (category && category !== "ALL") params.set("category", category);
+  if (genre && genre !== "ALL") params.set("genre", genre);
+  if (artist && artist !== "ALL") params.set("artist", artist);
   const qs = params.toString();
-  const data = await getJson<{ songs: Song[] }>(`${apiBase()}/songs${qs ? `?${qs}` : ""}`);
-  return data.songs;
+  const data = await getJson<{
+    songs: Song[];
+    genres?: string[];
+    artists?: string[];
+    categories?: string[];
+  }>(`${apiBase()}/songs${qs ? `?${qs}` : ""}`);
+  const genres = Array.isArray(data.genres)
+    ? data.genres
+    : Array.isArray(data.categories)
+      ? data.categories
+      : [];
+  return {
+    songs: Array.isArray(data.songs) ? data.songs : [],
+    genres,
+    artists: Array.isArray(data.artists) ? data.artists : [],
+  };
 }
 
 export async function fetchStatus(): Promise<StatusResponse> {

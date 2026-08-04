@@ -3,9 +3,12 @@ export type Song = {
   title: string;
   artist: string;
   category: string;
+  genre?: string;
   tags: string[];
   songKey: string | null;
   bpm: number | null;
+  difficulty?: number | null;
+  thumbnail?: string;
 };
 
 export type SongRequest = {

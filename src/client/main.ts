@@ -8,6 +8,7 @@ import {
   fetchMe,
   fetchSession,
   logout,
+  updateChannel,
   type AuthUser,
   type OAuthProvider,
   type UserChannel,
@@ -32,7 +33,6 @@ import {
 } from "./profile-editor";
 import type { Song, SongRequest, StatusResponse } from "./types";
 
-const CATEGORIES = ["ALL", "KPOP", "POP", "JPOP", "OST"] as const;
 const THEMES = ["dark", "light", "pink", "sky"] as const;
 type Theme = (typeof THEMES)[number];
 const THEME_LABELS: Record<Theme, string> = {
@@ -120,19 +120,30 @@ async function mountAccount(
   })();
 
   const ownChannels = channels.filter((ch) => ch.slug !== "demo");
-  const channelListHtml = ownChannels.length
-    ? ownChannels
-        .map(
-          (ch) => `
-        <a href="/c/${escapeHtml(ch.slug)}/admin" class="flex items-center justify-between gap-3 rounded-xl border border-glass-border bg-[var(--surface-2)] px-3 py-3 hover:bg-[var(--surface-3)] transition-colors text-left">
-          <div class="min-w-0">
-            <p class="text-sm font-extrabold text-main truncate">${escapeHtml(ch.name)}</p>
-            <p class="text-xs text-dim truncate">/c/${escapeHtml(ch.slug)}</p>
+  const own = ownChannels[0] ?? null;
+  const channelListHtml = own
+    ? `
+        <div class="rounded-xl border border-glass-border bg-[var(--surface-2)] px-3 py-3 space-y-3">
+          <form id="edit-channel-form" class="space-y-3" data-channel-id="${escapeHtml(own.id)}">
+            <label class="block text-left space-y-1.5">
+              <span class="text-xs font-extrabold text-dim tracking-wide">표시 이름</span>
+              <input id="edit-channel-name" type="text" maxlength="80" required class="w-full rounded-xl border border-glass-border bg-[var(--surface-3)] px-3 py-2.5 text-sm text-main" value="${escapeHtml(own.name)}" />
+            </label>
+            <label class="block text-left space-y-1.5">
+              <span class="text-xs font-extrabold text-dim tracking-wide">주소 (슬러그)</span>
+              <span class="flex items-center gap-1.5">
+                <span class="text-xs text-dim shrink-0">/c/</span>
+                <input id="edit-channel-slug" type="text" maxlength="63" required pattern="[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?" class="w-full rounded-xl border border-glass-border bg-[var(--surface-3)] px-3 py-2.5 text-sm text-main" value="${escapeHtml(own.slug)}" />
+              </span>
+            </label>
+            <p id="edit-channel-error" class="text-sm font-semibold text-center" style="color:#f87171" hidden></p>
+            <button type="submit" class="primary-btn w-full btn-sm">채널 저장</button>
+          </form>
+          <div class="flex gap-2">
+            <a href="/c/${escapeHtml(own.slug)}/admin" class="secondary-btn btn-sm flex-1 text-center">운영</a>
+            <a href="/c/${escapeHtml(own.slug)}" class="secondary-btn btn-sm flex-1 text-center" target="_blank" rel="noopener">공개 페이지</a>
           </div>
-          <span class="text-xs font-bold text-accent shrink-0">운영</span>
-        </a>`,
-        )
-        .join("")
+        </div>`
     : `<p class="text-sm text-dim text-center py-2">아직 만든 채널이 없습니다.</p>`;
 
   root.innerHTML = `
@@ -259,6 +270,46 @@ async function mountAccount(
       } catch (err) {
         createError.hidden = false;
         createError.textContent = err instanceof Error ? err.message : "채널 생성에 실패했습니다.";
+        if (submitBtn) submitBtn.disabled = false;
+      }
+    });
+  }
+
+  const editForm = document.querySelector<HTMLFormElement>("#edit-channel-form");
+  if (editForm) {
+    const channelId = editForm.dataset.channelId || "";
+    const nameInput = $("#edit-channel-name") as HTMLInputElement;
+    const slugInput = $("#edit-channel-slug") as HTMLInputElement;
+    const editError = $("#edit-channel-error");
+    const prevSlug = slugInput.value;
+
+    slugInput.addEventListener("input", () => {
+      slugInput.value = slugInput.value.toLowerCase().replace(/[^a-z0-9-]/g, "");
+    });
+
+    editForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      editError.hidden = true;
+      const submitBtn = editForm.querySelector<HTMLButtonElement>('button[type="submit"]');
+      if (submitBtn) submitBtn.disabled = true;
+      try {
+        const updated = await updateChannel(channelId, {
+          name: nameInput.value.trim(),
+          slug: slugInput.value.trim(),
+        });
+        const session = await fetchSession();
+        const slugChanged = updated.slug !== prevSlug;
+        await mountAccount(
+          root,
+          user,
+          session?.channels ?? [{ ...updated }],
+          slugChanged
+            ? `채널이 저장되었습니다. 새 주소는 /c/${updated.slug} 입니다.`
+            : "채널이 저장되었습니다.",
+        );
+      } catch (err) {
+        editError.hidden = false;
+        editError.textContent = err instanceof Error ? err.message : "채널 수정에 실패했습니다.";
         if (submitBtn) submitBtn.disabled = false;
       }
     });
@@ -448,14 +499,49 @@ function mountInvalidSlug() {
   `;
 }
 
+type ViewMode = "list" | "button";
+const VIEW_MODE_KEY = "sb_viewMode";
+const FILTER_OPEN_KEY = "sb_filterOpen";
+
+function readViewMode(): ViewMode {
+  try {
+    const raw = localStorage.getItem(VIEW_MODE_KEY);
+    if (raw === "button" || raw === "list") return raw;
+  } catch {
+    /* ignore */
+  }
+  return "list";
+}
+
+function readFilterOpen(): { genre: boolean; artist: boolean } {
+  try {
+    const raw = localStorage.getItem(FILTER_OPEN_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as { genre?: boolean; artist?: boolean };
+      return {
+        genre: parsed.genre !== false,
+        artist: parsed.artist !== false,
+      };
+    }
+  } catch {
+    /* ignore */
+  }
+  return { genre: true, artist: true };
+}
+
 type State = {
-  currentCategory: string;
+  currentGenre: string;
+  currentArtist: string;
   searchQuery: string;
   songs: Song[];
+  genres: string[];
+  artists: string[];
   queue: SongRequest[];
   status: StatusResponse | null;
   selectedSong: Song | null;
   submitting: boolean;
+  viewMode: ViewMode;
+  filterOpen: { genre: boolean; artist: boolean };
 };
 
 async function mountSongbook(slug: string) {
@@ -510,21 +596,41 @@ async function mountSongbook(slug: string) {
             </button>
           </div>
 
-          <div id="category-container" class="flex gap-2 overflow-x-auto scrollbar-none pb-0.5">
-            ${CATEGORIES.map(
-              (cat, i) =>
-                `<button type="button" class="chip${i === 0 ? " active" : ""}" data-category="${cat}">${cat}</button>`,
-            ).join("")}
+          <div class="filter-panels">
+            <section id="genre-filter-panel" class="filter-panel">
+              <button type="button" class="filter-panel-toggle" id="genre-filter-toggle" aria-expanded="true">
+                <span class="filter-panel-label">장르</span>
+                <span class="filter-panel-rule" aria-hidden="true"></span>
+                <span class="filter-panel-meta" id="genre-filter-meta"></span>
+                <span class="filter-chevron">${icons.chevronDown(16)}</span>
+              </button>
+              <div id="genre-chips" class="category-chips filter-panel-body"></div>
+            </section>
+            <section id="artist-filter-panel" class="filter-panel">
+              <button type="button" class="filter-panel-toggle" id="artist-filter-toggle" aria-expanded="true">
+                <span class="filter-panel-label">가수</span>
+                <span class="filter-panel-rule" aria-hidden="true"></span>
+                <span class="filter-panel-meta" id="artist-filter-meta"></span>
+                <span class="filter-chevron">${icons.chevronDown(16)}</span>
+              </button>
+              <div id="artist-chips" class="category-chips filter-panel-body"></div>
+            </section>
           </div>
 
-          <div class="flex items-center justify-between px-1 text-xs font-semibold">
+          <div class="flex items-center justify-between gap-3 px-1 text-xs font-semibold">
             <span class="text-dim">
               등록곡 <span id="song-count" class="text-main font-extrabold">0</span>곡
             </span>
-            <span id="sync-label" class="text-dim">연동 중…</span>
+            <div class="flex items-center gap-2.5">
+              <span id="sync-label" class="text-dim">연동 중…</span>
+              <div class="view-modes" role="group" aria-label="목록 보기">
+                <button type="button" class="view-btn" id="view-list-btn" title="리스트 모드" aria-label="리스트 모드">${icons.viewList(16)}</button>
+                <button type="button" class="view-btn" id="view-button-btn" title="버튼 모드" aria-label="버튼 모드">${icons.viewButton(16)}</button>
+              </div>
+            </div>
           </div>
 
-          <div id="song-list" class="space-y-2.5"></div>
+          <div id="song-list" class="song-list list-mode"></div>
         </section>
 
         <aside class="hidden lg:block sticky top-24">
@@ -604,13 +710,18 @@ async function mountSongbook(slug: string) {
 `;
 
   const state: State = {
-    currentCategory: "ALL",
+    currentGenre: "ALL",
+    currentArtist: "ALL",
     searchQuery: "",
     songs: [],
+    genres: [],
+    artists: [],
     queue: [],
     status: null,
     selectedSong: null,
     submitting: false,
+    viewMode: readViewMode(),
+    filterOpen: readFilterOpen(),
   };
 
   let toastTimer: number | undefined;
@@ -634,15 +745,115 @@ async function mountSongbook(slug: string) {
     return np ? `${np.title} - ${np.artist}` : "현재 재생 중인 곡이 없습니다.";
   }
 
-  function songBadges(song: Song): string {
-    const tags = song.tags
-      .map((tag) =>
-        tag.toUpperCase() === "MR"
-          ? `<span class="status-badge mr">MR</span>`
-          : `<span class="tag-badge">${escapeHtml(tag)}</span>`,
-      )
-      .join("");
-    return `<span class="category-badge">${escapeHtml(song.category)}</span>${tags}`;
+  function applyViewMode(mode: ViewMode) {
+    state.viewMode = mode;
+    try {
+      localStorage.setItem(VIEW_MODE_KEY, mode);
+    } catch {
+      /* ignore */
+    }
+    const list = $("#song-list");
+    list.classList.toggle("list-mode", mode === "list");
+    list.classList.toggle("button-mode", mode === "button");
+    $("#view-list-btn").classList.toggle("active", mode === "list");
+    $("#view-button-btn").classList.toggle("active", mode === "button");
+  }
+
+  function applyFilterPanelOpen() {
+    const genrePanel = $("#genre-filter-panel");
+    const artistPanel = $("#artist-filter-panel");
+    genrePanel.classList.toggle("is-collapsed", !state.filterOpen.genre);
+    artistPanel.classList.toggle("is-collapsed", !state.filterOpen.artist);
+    $("#genre-filter-toggle").setAttribute(
+      "aria-expanded",
+      state.filterOpen.genre ? "true" : "false",
+    );
+    $("#artist-filter-toggle").setAttribute(
+      "aria-expanded",
+      state.filterOpen.artist ? "true" : "false",
+    );
+  }
+
+  function persistFilterOpen() {
+    try {
+      localStorage.setItem(FILTER_OPEN_KEY, JSON.stringify(state.filterOpen));
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function renderFilterChips(
+    containerId: string,
+    metaId: string,
+    items: string[],
+    current: string,
+    dataAttr: "genre" | "artist",
+    onResetCurrent: () => void,
+  ) {
+    const container = $(`#${containerId}`);
+    const meta = $(`#${metaId}`);
+    const known = new Set(items.map((v) => v.toLowerCase()));
+    if (current !== "ALL" && !known.has(current.toLowerCase())) {
+      onResetCurrent();
+      current = "ALL";
+    }
+    const chips = [
+      `<button type="button" class="chip${current === "ALL" ? " active" : ""}" data-${dataAttr}="ALL">ALL</button>`,
+      ...items.map((item) => {
+        const selected = current.toLowerCase() === item.toLowerCase();
+        return `<button type="button" class="chip${selected ? " active" : ""}" data-${dataAttr}="${escapeHtml(item)}">${escapeHtml(item)}</button>`;
+      }),
+    ];
+    container.innerHTML = chips.join("");
+    const selectedLabel = current === "ALL" ? "" : current;
+    meta.textContent = selectedLabel;
+    meta.classList.toggle("has-selection", Boolean(selectedLabel));
+    meta.title = selectedLabel;
+  }
+
+  function renderFilterPanels() {
+    renderFilterChips(
+      "genre-chips",
+      "genre-filter-meta",
+      state.genres,
+      state.currentGenre,
+      "genre",
+      () => {
+        state.currentGenre = "ALL";
+      },
+    );
+    renderFilterChips(
+      "artist-chips",
+      "artist-filter-meta",
+      state.artists,
+      state.currentArtist,
+      "artist",
+      () => {
+        state.currentArtist = "ALL";
+      },
+    );
+    applyFilterPanelOpen();
+  }
+
+  function songGenreLabel(song: Song): string {
+    const genre = String(song.genre || "").trim();
+    if (genre) return genre;
+    return String(song.category || "").trim() || "미분류";
+  }
+
+  function songCategoryLabel(song: Song): string {
+    return String(song.category || "").trim();
+  }
+
+  function difficultyStarsHtml(level: number | null | undefined): string {
+    const n =
+      typeof level === "number" && level >= 1 && level <= 5 ? Math.round(level) : 0;
+    const stars = Array.from({ length: 5 }, (_, i) => {
+      const on = i < n;
+      return `<span class="${on ? "on" : ""}">${on ? "★" : "☆"}</span>`;
+    }).join("");
+    const title = n ? `난이도 ${n}` : "난이도 미설정";
+    return `<span class="diff-stars${n ? "" : " is-empty"}" title="${title}" aria-label="${title}">${stars}</span>`;
   }
 
   function renderSongs() {
@@ -659,23 +870,89 @@ async function mountSongbook(slug: string) {
     }
 
     const accepting = isAccepting();
+    const isButton = state.viewMode === "button";
+
     list.innerHTML = state.songs
-      .map(
-        (song) => `
-          <div class="song-card">
-            <div class="min-w-0 space-y-1.5">
-              <p class="song-name">${escapeHtml(song.title)}</p>
-              <p class="song-artist">${escapeHtml(song.artist)}</p>
-              <div class="badge-row flex items-center gap-1.5 flex-wrap pt-0.5">${songBadges(song)}</div>
+      .map((song) => {
+        const thumb = typeof song.thumbnail === "string" ? song.thumbnail.trim() : "";
+        const thumbInner = thumb
+          ? `<img src="${escapeHtml(thumb)}" alt="" loading="lazy" referrerpolicy="no-referrer" />`
+          : `<span class="song-thumb--empty">${icons.disc(isButton ? 22 : 28)}</span>`;
+
+        const tags = Array.isArray(song.tags) ? song.tags : [];
+        const hasMr = tags.some((t) => String(t).toUpperCase() === "MR");
+        const otherTags = tags.filter((t) => String(t).toUpperCase() !== "MR");
+        const mrBadge = hasMr ? `<span class="status-badge mr">MR</span>` : "";
+        const mrBadgeSm = hasMr ? `<span class="status-badge mr sm">MR</span>` : "";
+        const genreLabel = songGenreLabel(song);
+        const categoryLabel = songCategoryLabel(song);
+        const categoryBadge = categoryLabel
+          ? `<span class="category-badge">${escapeHtml(categoryLabel)}</span>`
+          : "";
+        const genreBadge = `<span class="genre-badge">${escapeHtml(genreLabel)}</span>`;
+        const diffStars = difficultyStarsHtml(song.difficulty);
+        const tagHtml =
+          otherTags.length > 0
+            ? otherTags
+                .map((t) => `<span class="tag-badge">${escapeHtml(t)}</span>`)
+                .join("")
+            : `<span class="tag-no-info">태그 없음</span>`;
+
+        if (isButton) {
+          return `
+          <article
+            class="song-card button-row${accepting ? "" : " is-disabled"}"
+            data-song-id="${escapeHtml(song.id)}"
+            role="button"
+            tabindex="0"
+            title="${accepting ? "신청하기" : "신청 마감"}"
+          >
+            <div class="thumbnail">${thumbInner}</div>
+            <div class="song-info-content button-layout">
+              <div class="col col-info">
+                <div class="song-name" title="${escapeHtml(song.title)}">${escapeHtml(song.title)}</div>
+                <div class="song-artist">${escapeHtml(song.artist)}</div>
+                <div class="button-meta-row">
+                  ${diffStars}
+                  ${mrBadgeSm}
+                  ${genreBadge}
+                </div>
+              </div>
             </div>
-            <button
-              type="button"
-              class="request-btn primary-btn btn-sm shrink-0"
-              data-song-id="${escapeHtml(song.id)}"
-              ${accepting ? "" : "disabled"}
-            >${icons.mic(15)}신청</button>
-          </div>`,
-      )
+          </article>`;
+        }
+
+        return `
+          <article class="song-card list-row">
+            <div class="thumbnail">${thumbInner}</div>
+            <div class="col col-info">
+              <div class="song-name" title="${escapeHtml(song.title)}">${escapeHtml(song.title)}</div>
+              <div class="song-artist-badge">${escapeHtml(song.artist)}</div>
+              <div class="list-mobile-meta">
+                ${mrBadge}
+                ${categoryBadge}
+                ${genreBadge}
+              </div>
+            </div>
+            <div class="col col-genre">
+              <div class="status-badge-wrapper">${mrBadge}</div>
+              ${categoryBadge}
+              ${genreBadge}
+            </div>
+            <div class="col col-tags">
+              <div class="tag-container${otherTags.length === 0 ? " no-info" : ""}">${tagHtml}</div>
+            </div>
+            <div class="col col-action">
+              ${diffStars}
+              <button
+                type="button"
+                class="request-btn primary-btn btn-sm"
+                data-song-id="${escapeHtml(song.id)}"
+                ${accepting ? "" : "disabled"}
+              >${icons.mic(15)}신청</button>
+            </div>
+          </article>`;
+      })
       .join("");
   }
 
@@ -733,6 +1010,14 @@ async function mountSongbook(slug: string) {
 
     renderQueueItems($("#queue-list"), state.queue);
     renderQueueItems($("#aside-queue-list"), state.queue);
+
+    document.querySelectorAll<HTMLButtonElement>(".request-btn").forEach((btn) => {
+      btn.disabled = !accepting;
+    });
+    document.querySelectorAll<HTMLElement>(".song-card.button-row").forEach((card) => {
+      card.classList.toggle("is-disabled", !accepting);
+      card.title = accepting ? "신청하기" : "신청 마감";
+    });
   }
 
   function openRequestModal(songId: string) {
@@ -782,8 +1067,16 @@ async function mountSongbook(slug: string) {
 
   async function refreshSongs() {
     try {
-      state.songs = await fetchSongs(state.searchQuery, state.currentCategory);
+      const data = await fetchSongs(
+        state.searchQuery,
+        state.currentGenre,
+        state.currentArtist,
+      );
+      state.songs = data.songs;
+      state.genres = data.genres;
+      state.artists = data.artists;
       $("#sync-label").textContent = "실시간 연동 중";
+      renderFilterPanels();
       renderSongs();
     } catch (err) {
       $("#sync-label").textContent = "연동 오류";
@@ -824,19 +1117,75 @@ async function mountSongbook(slug: string) {
     void refreshSongs();
   });
 
-  $("#category-container").addEventListener("click", (e) => {
+  $("#genre-filter-toggle").addEventListener("click", () => {
+    state.filterOpen.genre = !state.filterOpen.genre;
+    persistFilterOpen();
+    applyFilterPanelOpen();
+  });
+  $("#artist-filter-toggle").addEventListener("click", () => {
+    state.filterOpen.artist = !state.filterOpen.artist;
+    persistFilterOpen();
+    applyFilterPanelOpen();
+  });
+
+  $("#genre-chips").addEventListener("click", (e) => {
     const btn = (e.target as HTMLElement).closest<HTMLElement>(".chip");
     if (!btn) return;
-    document.querySelectorAll(".chip").forEach((b) => b.classList.remove("active"));
+    $("#genre-chips")
+      .querySelectorAll(".chip")
+      .forEach((b) => b.classList.remove("active"));
     btn.classList.add("active");
-    state.currentCategory = btn.dataset.category ?? "ALL";
+    state.currentGenre = btn.dataset.genre ?? "ALL";
     void refreshSongs();
+  });
+
+  $("#artist-chips").addEventListener("click", (e) => {
+    const btn = (e.target as HTMLElement).closest<HTMLElement>(".chip");
+    if (!btn) return;
+    $("#artist-chips")
+      .querySelectorAll(".chip")
+      .forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
+    state.currentArtist = btn.dataset.artist ?? "ALL";
+    void refreshSongs();
+  });
+
+  applyFilterPanelOpen();
+  applyViewMode(state.viewMode);
+
+  $("#view-list-btn").addEventListener("click", () => {
+    if (state.viewMode === "list") return;
+    applyViewMode("list");
+    renderSongs();
+  });
+  $("#view-button-btn").addEventListener("click", () => {
+    if (state.viewMode === "button") return;
+    applyViewMode("button");
+    renderSongs();
   });
 
   $("#song-list").addEventListener("click", (e) => {
     const btn = (e.target as HTMLElement).closest<HTMLButtonElement>(".request-btn");
-    if (!btn || btn.disabled) return;
-    openRequestModal(btn.dataset.songId ?? "");
+    if (btn) {
+      if (btn.disabled) return;
+      openRequestModal(btn.dataset.songId ?? "");
+      return;
+    }
+    const card = (e.target as HTMLElement).closest<HTMLElement>(".song-card.button-row");
+    if (!card) return;
+    if (card.classList.contains("is-disabled") || !isAccepting()) {
+      showToast("지금은 신청을 받지 않습니다.");
+      return;
+    }
+    openRequestModal(card.dataset.songId ?? "");
+  });
+
+  $("#song-list").addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    const card = (e.target as HTMLElement).closest<HTMLElement>(".song-card.button-row");
+    if (!card) return;
+    e.preventDefault();
+    card.click();
   });
 
   $("#close-request-modal").addEventListener("click", closeRequestModal);

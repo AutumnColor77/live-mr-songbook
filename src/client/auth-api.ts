@@ -93,6 +93,29 @@ export async function createChannel(input: {
   };
 }
 
+export async function updateChannel(
+  channelId: string,
+  input: { name: string; slug: string },
+): Promise<UserChannel> {
+  const data = await fetchJson<{
+    channel: UserChannel & { createdAt?: number };
+  }>(`/api/me/channels/${encodeURIComponent(channelId)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: input.name,
+      slug: input.slug,
+    }),
+  });
+  if (!data.channel?.slug) throw new Error("채널 수정에 실패했습니다.");
+  return {
+    id: data.channel.id,
+    slug: data.channel.slug,
+    name: data.channel.name,
+    role: data.channel.role || "admin",
+  };
+}
+
 export async function fetchAuthStatus(): Promise<{
   googleEnabled: boolean;
   naverEnabled: boolean;

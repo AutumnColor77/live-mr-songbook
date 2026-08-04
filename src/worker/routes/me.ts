@@ -149,4 +149,100 @@ me.post("/channels", async (c) => {
   );
 });
 
+me.patch("/channels/:id", async (c) => {
+  const user = await loadUserFromSession(c);
+  if (!user) return c.json({ error: "Unauthorized" }, 401);
+
+  const channelId = c.req.param("id");
+  const membership = await c.env.DB.prepare(
+    `SELECT c.id, c.slug, c.name, c.created_at, cm.role
+     FROM channel_members cm
+     JOIN channels c ON c.id = cm.channel_id
+     WHERE cm.user_id = ? AND cm.channel_id = ? AND cm.role = 'admin'`,
+  )
+    .bind(user.id, channelId)
+    .first<{
+      id: string;
+      slug: string;
+      name: string;
+      created_at: number;
+      role: string;
+    }>();
+
+  if (!membership) {
+    return c.json({ error: "채널을 찾을 수 없거나 수정 권한이 없습니다." }, 404);
+  }
+  if (membership.slug === "demo") {
+    return c.json({ error: "데모 채널은 수정할 수 없습니다." }, 403);
+  }
+
+  let body: { slug?: string; name?: string };
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "Invalid JSON body" }, 400);
+  }
+
+  const nextName =
+    body.name !== undefined
+      ? String(body.name).trim()
+      : membership.name;
+  if (!nextName || nextName.length > 80) {
+    return c.json({ error: "채널 이름(최대 80자)을 입력해 주세요." }, 400);
+  }
+
+  let nextSlug = membership.slug;
+  if (body.slug !== undefined) {
+    const preferred = String(body.slug).trim().toLowerCase();
+    if (!preferred) {
+      return c.json({ error: "슬러그를 입력해 주세요." }, 400);
+    }
+    if (!SLUG_RE.test(preferred) || RESERVED_SLUGS.has(preferred)) {
+      return c.json(
+        { error: "슬러그는 영문 소문자·숫자·하이픈만 가능합니다 (1–63자)." },
+        400,
+      );
+    }
+    if (preferred !== membership.slug) {
+      const taken = await c.env.DB.prepare(
+        "SELECT id FROM channels WHERE slug = ? AND id != ?",
+      )
+        .bind(preferred, channelId)
+        .first();
+      if (taken) {
+        return c.json({ error: "이미 사용 중인 주소입니다." }, 409);
+      }
+      nextSlug = preferred;
+    }
+  }
+
+  if (nextName === membership.name && nextSlug === membership.slug) {
+    return c.json({
+      channel: {
+        id: membership.id,
+        slug: membership.slug,
+        name: membership.name,
+        role: membership.role,
+        createdAt: membership.created_at,
+      },
+    });
+  }
+
+  await c.env.DB.prepare(
+    "UPDATE channels SET name = ?, slug = ? WHERE id = ?",
+  )
+    .bind(nextName, nextSlug, channelId)
+    .run();
+
+  return c.json({
+    channel: {
+      id: membership.id,
+      slug: nextSlug,
+      name: nextName,
+      role: membership.role,
+      createdAt: membership.created_at,
+    },
+  });
+});
+
 export default me;
