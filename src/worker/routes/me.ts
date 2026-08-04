@@ -80,6 +80,19 @@ me.post("/channels", async (c) => {
   if (!name || name.length > 80) {
     return c.json({ error: "채널 이름(최대 80자)을 입력해 주세요." }, 400);
   }
+
+  const alreadyOwns = await c.env.DB.prepare(
+    `SELECT c.id FROM channel_members cm
+     JOIN channels c ON c.id = cm.channel_id
+     WHERE cm.user_id = ? AND c.slug != 'demo'
+     LIMIT 1`,
+  )
+    .bind(user.id)
+    .first();
+  if (alreadyOwns) {
+    return c.json({ error: "계정당 채널은 1개만 만들 수 있습니다." }, 409);
+  }
+
   if (preferred && (!SLUG_RE.test(preferred) || RESERVED_SLUGS.has(preferred))) {
     return c.json(
       { error: "슬러그는 영문 소문자·숫자·하이픈만 가능합니다 (1–63자)." },

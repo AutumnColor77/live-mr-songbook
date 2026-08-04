@@ -176,6 +176,9 @@ async function mountAccount(
             <div class="space-y-2">${channelListHtml}</div>
           </section>
 
+          ${
+            ownChannels.length === 0
+              ? `
           <form id="create-channel-form" class="space-y-3 border-t border-glass-border pt-5">
             <p class="text-xs font-extrabold text-dim tracking-wide text-center">채널 만들기</p>
             <label class="block text-left space-y-1.5">
@@ -186,15 +189,17 @@ async function mountAccount(
               주소는 자동으로 정해집니다. 만든 뒤 <code class="text-accent">/c/…</code> 로 확인하세요.
             </p>
             <details id="slug-details" class="text-left">
-              <summary class="cursor-pointer text-xs font-extrabold text-dim tracking-wide">URL(슬러그) 직접 지정</summary>
+              <summary class="cursor-pointer text-xs font-extrabold text-dim tracking-wide">URL 직접 지정</summary>
               <label class="mt-2 flex items-center gap-1.5">
                 <span class="text-xs text-dim shrink-0">/c/</span>
                 <input id="channel-slug" type="text" maxlength="63" pattern="[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?" class="w-full rounded-xl border border-glass-border bg-[var(--surface-2)] px-3 py-2.5 text-sm text-main" placeholder="비우면 자동 생성" />
               </label>
             </details>
             <p id="create-channel-error" class="text-sm font-semibold text-center" style="color:#f87171" hidden></p>
-            <button type="submit" class="primary-btn w-full">채널 만들고 운영하기</button>
-          </form>
+            <button type="submit" class="primary-btn w-full">채널 만들기</button>
+          </form>`
+              : ""
+          }
 
           <details class="border-t border-glass-border pt-5">
             <summary class="cursor-pointer text-sm font-extrabold text-main text-center list-none">프로필 수정</summary>
@@ -229,33 +234,35 @@ async function mountAccount(
     location.assign("/");
   });
 
-  const createForm = $("#create-channel-form") as HTMLFormElement;
-  const nameInput = $("#channel-name") as HTMLInputElement;
-  const slugInput = $("#channel-slug") as HTMLInputElement;
-  const createError = $("#create-channel-error");
+  const createForm = document.querySelector<HTMLFormElement>("#create-channel-form");
+  if (createForm) {
+    const nameInput = $("#channel-name") as HTMLInputElement;
+    const slugInput = $("#channel-slug") as HTMLInputElement;
+    const createError = $("#create-channel-error");
 
-  slugInput.addEventListener("input", () => {
-    slugInput.value = slugInput.value.toLowerCase().replace(/[^a-z0-9-]/g, "");
-  });
+    slugInput.addEventListener("input", () => {
+      slugInput.value = slugInput.value.toLowerCase().replace(/[^a-z0-9-]/g, "");
+    });
 
-  createForm.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    createError.hidden = true;
-    const submitBtn = createForm.querySelector<HTMLButtonElement>('button[type="submit"]');
-    if (submitBtn) submitBtn.disabled = true;
-    try {
-      const customSlug = slugInput.value.trim();
-      const channel = await createChannel({
-        name: nameInput.value.trim(),
-        ...(customSlug ? { slug: customSlug } : {}),
-      });
-      location.assign(`/c/${channel.slug}/admin?auth=ok`);
-    } catch (err) {
-      createError.hidden = false;
-      createError.textContent = err instanceof Error ? err.message : "채널 생성에 실패했습니다.";
-      if (submitBtn) submitBtn.disabled = false;
-    }
-  });
+    createForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      createError.hidden = true;
+      const submitBtn = createForm.querySelector<HTMLButtonElement>('button[type="submit"]');
+      if (submitBtn) submitBtn.disabled = true;
+      try {
+        const customSlug = slugInput.value.trim();
+        const channel = await createChannel({
+          name: nameInput.value.trim(),
+          ...(customSlug ? { slug: customSlug } : {}),
+        });
+        location.assign(`/c/${channel.slug}/admin?auth=ok`);
+      } catch (err) {
+        createError.hidden = false;
+        createError.textContent = err instanceof Error ? err.message : "채널 생성에 실패했습니다.";
+        if (submitBtn) submitBtn.disabled = false;
+      }
+    });
+  }
 
   bindProfileEditor({
     initial: user,
