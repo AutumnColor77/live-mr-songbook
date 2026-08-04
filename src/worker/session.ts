@@ -67,7 +67,7 @@ export async function consumeOAuthState(
   if (!row) return { ok: false };
 
   await db.prepare("DELETE FROM oauth_states WHERE state = ?").bind(state).run();
-  return { ok: true, nextPath: row.next_path || "/c/demo/admin" };
+  return { ok: true, nextPath: row.next_path || "/me" };
 }
 
 export function takeOAuthStateCookie(c: Context<AppEnv>): string | null {

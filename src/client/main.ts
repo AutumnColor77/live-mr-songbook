@@ -1,13 +1,16 @@
 import "./style.css";
 import { mountAdmin } from "./admin";
 import {
+  createChannel,
   exchangeOAuthCode,
   fetchAuthStatus,
   fetchDesktopHandoff,
   fetchMe,
+  fetchSession,
   logout,
   type AuthUser,
   type OAuthProvider,
+  type UserChannel,
 } from "./auth-api";
 import {
   fetchQueue,
@@ -101,7 +104,12 @@ function consumeAuthQuery(): { notice: string; ok: boolean } {
   return { notice, ok };
 }
 
-async function mountAccount(root: HTMLElement, user: AuthUser, notice = ""): Promise<void> {
+async function mountAccount(
+  root: HTMLElement,
+  user: AuthUser,
+  channels: UserChannel[],
+  notice = "",
+): Promise<void> {
   applyTheme(currentTheme());
   document.title = "내 계정 · Live MR Songbook";
 
@@ -110,6 +118,22 @@ async function mountAccount(root: HTMLElement, user: AuthUser, notice = ""): Pro
     if (!raw.startsWith("/") || raw.startsWith("//") || raw.includes("://")) return "";
     return raw;
   })();
+
+  const ownChannels = channels.filter((ch) => ch.slug !== "demo");
+  const channelListHtml = ownChannels.length
+    ? ownChannels
+        .map(
+          (ch) => `
+        <a href="/c/${escapeHtml(ch.slug)}/admin" class="flex items-center justify-between gap-3 rounded-xl border border-glass-border bg-[var(--surface-2)] px-3 py-3 hover:bg-[var(--surface-3)] transition-colors text-left">
+          <div class="min-w-0">
+            <p class="text-sm font-extrabold text-main truncate">${escapeHtml(ch.name)}</p>
+            <p class="text-xs text-dim truncate">/c/${escapeHtml(ch.slug)}</p>
+          </div>
+          <span class="text-xs font-bold text-accent shrink-0">운영</span>
+        </a>`,
+        )
+        .join("")
+    : `<p class="text-sm text-dim text-center py-2">아직 만든 채널이 없습니다.</p>`;
 
   root.innerHTML = `
     <div class="relative z-10 min-h-screen flex flex-col">
@@ -125,28 +149,68 @@ async function mountAccount(root: HTMLElement, user: AuthUser, notice = ""): Pro
         </div>
       </header>
       <main class="flex-1 flex items-center justify-center px-4 py-12">
-        <form id="profile-edit-form" class="panel max-w-md w-full p-8 space-y-5 text-center">
-          <div class="space-y-1">
+        <div class="panel max-w-md w-full p-8 space-y-6">
+          <div class="text-center space-y-3">
             <p class="modal-eyebrow">Account</p>
-            <h1 class="text-xl font-extrabold text-main">프로필 수정</h1>
-            <p class="text-xs text-dim truncate">${escapeHtml(user.email)}</p>
+            <h1 class="text-xl font-extrabold text-main">내 채널</h1>
+            <div class="flex items-center gap-3 justify-center">
+              ${
+                user.picture
+                  ? `<img src="${escapeHtml(user.picture)}" alt="" class="w-12 h-12 rounded-full border border-glass-border object-cover" referrerpolicy="no-referrer" />`
+                  : `<span class="w-12 h-12 rounded-full bg-[var(--surface-3)] flex items-center justify-center text-base font-extrabold text-main">${escapeHtml((user.name || user.email).slice(0, 1).toUpperCase())}</span>`
+              }
+              <div class="min-w-0 text-left">
+                <p class="text-sm font-extrabold text-main truncate">${escapeHtml(user.name || "사용자")}</p>
+                <p class="text-xs text-dim truncate">${escapeHtml(user.email)}</p>
+              </div>
+            </div>
+            ${
+              notice
+                ? `<p class="text-sm font-semibold" style="color:${notice.startsWith("로그인") || notice.startsWith("저장") || notice.startsWith("채널") ? "#4ade80" : "#f87171"}">${escapeHtml(notice)}</p>`
+                : ""
+            }
           </div>
-          ${
-            notice
-              ? `<p id="profile-notice" class="text-sm font-semibold" style="color:${notice.startsWith("로그인") || notice.startsWith("저장") ? "#4ade80" : "#f87171"}">${escapeHtml(notice)}</p>`
-              : `<p id="profile-notice" class="text-sm font-semibold" hidden></p>`
-          }
-          ${profileEditorFieldsHtml(user)}
-          <button type="submit" class="primary-btn w-full">저장</button>
+
+          <section class="space-y-2.5">
+            <p class="text-xs font-extrabold text-dim tracking-wide">내 채널</p>
+            <div class="space-y-2">${channelListHtml}</div>
+          </section>
+
+          <form id="create-channel-form" class="space-y-3 border-t border-glass-border pt-5">
+            <p class="text-xs font-extrabold text-dim tracking-wide text-center">채널 만들기</p>
+            <label class="block text-left space-y-1.5">
+              <span class="text-xs font-extrabold text-dim tracking-wide">표시 이름</span>
+              <input id="channel-name" type="text" maxlength="80" required class="w-full rounded-xl border border-glass-border bg-[var(--surface-2)] px-3 py-2.5 text-sm text-main" placeholder="예: 가을색의 노래책" />
+            </label>
+            <label class="block text-left space-y-1.5">
+              <span class="text-xs font-extrabold text-dim tracking-wide">슬러그 (URL)</span>
+              <div class="flex items-center gap-1.5">
+                <span class="text-xs text-dim shrink-0">/c/</span>
+                <input id="channel-slug" type="text" maxlength="63" required pattern="[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?" class="w-full rounded-xl border border-glass-border bg-[var(--surface-2)] px-3 py-2.5 text-sm text-main" placeholder="my-stream" />
+              </div>
+            </label>
+            <p id="create-channel-error" class="text-sm font-semibold text-center" style="color:#f87171" hidden></p>
+            <button type="submit" class="primary-btn w-full">채널 만들고 운영하기</button>
+          </form>
+
+          <details class="border-t border-glass-border pt-5">
+            <summary class="cursor-pointer text-sm font-extrabold text-main text-center list-none">프로필 수정</summary>
+            <form id="profile-edit-form" class="mt-4 space-y-5 text-center">
+              ${profileEditorFieldsHtml(user)}
+              <button type="submit" class="primary-btn w-full">프로필 저장</button>
+            </form>
+          </details>
+
           <div class="border-t border-glass-border pt-5 space-y-3">
             ${
               nextPath
-                ? `<a href="${escapeHtml(nextPath)}" class="primary-btn w-full">돌아가기</a>`
-                : `<a href="/c/demo/admin" class="primary-btn w-full">데모 채널 운영 화면</a>`
+                ? `<a href="${escapeHtml(nextPath)}" class="secondary-btn w-full">돌아가기</a>`
+                : ""
             }
+            <a href="/c/demo" class="secondary-btn w-full">데모 노래책 체험</a>
             <a href="/" class="secondary-btn w-full">홈으로</a>
           </div>
-        </form>
+        </div>
       </main>
       <div id="toast" class="toast" hidden></div>
     </div>
@@ -162,26 +226,54 @@ async function mountAccount(root: HTMLElement, user: AuthUser, notice = ""): Pro
     location.assign("/");
   });
 
+  const createForm = $("#create-channel-form") as HTMLFormElement;
+  const nameInput = $("#channel-name") as HTMLInputElement;
+  const slugInput = $("#channel-slug") as HTMLInputElement;
+  const createError = $("#create-channel-error");
+
+  nameInput.addEventListener("input", () => {
+    if (slugInput.dataset.touched === "1") return;
+    slugInput.value = nameInput.value
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 63);
+  });
+  slugInput.addEventListener("input", () => {
+    slugInput.dataset.touched = "1";
+    slugInput.value = slugInput.value.toLowerCase().replace(/[^a-z0-9-]/g, "");
+  });
+
+  createForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    createError.hidden = true;
+    const submitBtn = createForm.querySelector<HTMLButtonElement>('button[type="submit"]');
+    if (submitBtn) submitBtn.disabled = true;
+    try {
+      const channel = await createChannel({
+        slug: slugInput.value.trim(),
+        name: nameInput.value.trim(),
+      });
+      location.assign(`/c/${channel.slug}/admin?auth=ok`);
+    } catch (err) {
+      createError.hidden = false;
+      createError.textContent = err instanceof Error ? err.message : "채널 생성에 실패했습니다.";
+      if (submitBtn) submitBtn.disabled = false;
+    }
+  });
+
   bindProfileEditor({
     initial: user,
     form: $("#profile-edit-form") as HTMLFormElement,
-    onSaved: (saved) => {
-      const noticeEl = document.querySelector<HTMLElement>("#profile-notice");
-      if (noticeEl) {
-        noticeEl.hidden = false;
-        noticeEl.style.color = "#4ade80";
-        noticeEl.textContent = "저장되었습니다.";
-      }
-      const submitBtn = document.querySelector<HTMLButtonElement>(
-        '#profile-edit-form button[type="submit"]',
+    onSaved: async (saved) => {
+      const session = await fetchSession();
+      await mountAccount(
+        root,
+        saved,
+        session?.channels ?? channels,
+        "저장되었습니다.",
       );
-      if (submitBtn) submitBtn.disabled = false;
-      if (nextPath) {
-        const sep = nextPath.includes("?") ? "&" : "?";
-        location.assign(`${nextPath}${sep}auth=ok`);
-        return;
-      }
-      void mountAccount(root, saved, "저장되었습니다.");
     },
   });
 }
@@ -216,16 +308,16 @@ function mountLanding(
         }
         <div class="min-w-0 text-left flex-1">
           <p class="text-sm font-extrabold text-main truncate">${escapeHtml(user.name || "사용자")}</p>
-          <p class="text-xs text-dim truncate">프로필 수정</p>
+          <p class="text-xs text-dim truncate">내 채널 · 프로필</p>
         </div>
       </a>
-      <a href="/c/demo/admin" class="primary-btn w-full">데모 운영 화면</a>
+      <a href="/me" class="primary-btn w-full">내 채널 관리</a>
       <button id="logout-btn" type="button" class="secondary-btn w-full">로그아웃</button>
     `
     : `
       ${loginButtonHtml(providers)}
       <p class="text-xs text-dim text-center leading-relaxed">
-        로그인하면 데모 채널 운영 화면으로 이동합니다.
+        로그인하면 내 채널을 만들고 운영할 수 있습니다.
       </p>
     `;
 
@@ -262,8 +354,7 @@ function mountLanding(
           }
           ${authBlock}
           <div class="border-t border-glass-border pt-5 space-y-3">
-            <a href="/c/demo" class="primary-btn w-full">데모 노래책 열기</a>
-            <a href="/c/demo/admin" class="secondary-btn w-full">데모 운영 화면</a>
+            <a href="/c/demo" class="secondary-btn w-full">데모 노래책 체험</a>
           </div>
           <p class="text-xs text-dim leading-relaxed">
             시청자 <code class="text-accent">/c/채널슬러그</code><br />
@@ -289,7 +380,7 @@ function mountLanding(
     });
   }
 
-  bindLoginPicker({ next: "/c/demo/admin", onToast: showToast });
+  bindLoginPicker({ next: "/me", onToast: showToast });
 }
 
 async function mountProfileSetup(root: HTMLElement, user: AuthUser): Promise<void> {
@@ -298,9 +389,9 @@ async function mountProfileSetup(root: HTMLElement, user: AuthUser): Promise<voi
 
   const params = new URLSearchParams(location.search);
   const nextPath = (() => {
-    const raw = params.get("next") || "/c/demo/admin";
+    const raw = params.get("next") || "/me";
     if (!raw.startsWith("/") || raw.startsWith("//") || raw.includes("://")) {
-      return "/c/demo/admin";
+      return "/me";
     }
     return raw;
   })();
@@ -831,8 +922,8 @@ async function boot() {
       return;
     }
     if (!user.needsProfileSetup) {
-      const next = new URLSearchParams(location.search).get("next") || "/c/demo/admin";
-      location.replace(next.startsWith("/") ? next : "/c/demo/admin");
+      const next = new URLSearchParams(location.search).get("next") || "/me";
+      location.replace(next.startsWith("/") ? next : "/me");
       return;
     }
     await mountProfileSetup(app!, user);
@@ -841,25 +932,38 @@ async function boot() {
 
   if (location.pathname === "/me" || location.pathname === "/me/") {
     const { notice } = consumeAuthQuery();
-    const user = await fetchMe();
-    if (!user) {
+    const session = await fetchSession();
+    if (!session) {
       location.replace("/?auth=error&reason=access_denied");
       return;
     }
-    if (user.needsProfileSetup) {
+    if (session.user.needsProfileSetup) {
       location.replace("/me/setup?next=/me");
       return;
     }
-    await mountAccount(app!, user, notice);
+    await mountAccount(app!, session.user, session.channels, notice);
     return;
   }
 
   if (location.pathname === "/" || location.pathname === "") {
     const { notice } = consumeAuthQuery();
+    const params = new URLSearchParams(location.search);
+    const isDesktop = params.get("client") === "desktop";
     const [user, status] = await Promise.all([fetchMe(), fetchAuthStatus()]);
     if (user?.needsProfileSetup) {
-      location.replace("/me/setup?next=/c/demo/admin");
+      const setupQ = new URLSearchParams({ next: "/me" });
+      if (isDesktop) setupQ.set("client", "desktop");
+      location.replace(`/me/setup?${setupQ}`);
       return;
+    }
+    if (isDesktop && user) {
+      try {
+        const { deepLink } = await fetchDesktopHandoff();
+        location.replace(deepLink);
+        return;
+      } catch (err) {
+        console.warn("[boot] desktop handoff failed", err);
+      }
     }
     mountLanding(user, notice, { googleEnabled: status.googleEnabled, naverEnabled: status.naverEnabled });
     return;
@@ -887,7 +991,7 @@ async function boot() {
   // Unknown path → landing
   const [user, status] = await Promise.all([fetchMe(), fetchAuthStatus()]);
   if (user?.needsProfileSetup) {
-    location.replace("/me/setup?next=/c/demo/admin");
+    location.replace("/me/setup?next=/me");
     return;
   }
   mountLanding(user, "", { googleEnabled: status.googleEnabled, naverEnabled: status.naverEnabled });

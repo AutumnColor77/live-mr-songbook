@@ -22,7 +22,7 @@ const NAVER_AUTH_URL = "https://nid.naver.com/oauth2.0/authorize";
 const NAVER_TOKEN_URL = "https://nid.naver.com/oauth2.0/token";
 const NAVER_USERINFO_URL = "https://openapi.naver.com/v1/nid/me";
 
-const DEFAULT_NEXT = "/c/demo/admin";
+const DEFAULT_NEXT = "/me";
 const DESKTOP_SCHEME = "live-mr-manager";
 
 const auth = new Hono<AppEnv>();
@@ -426,9 +426,32 @@ function registerProviderRoutes(provider: OAuthProvider) {
   });
 }
 
+async function listChannelsForUser(db: D1Database, userId: string) {
+  await ensureDemoMembership(db, userId);
+  const { results } = await db
+    .prepare(
+      `SELECT c.id, c.slug, c.name, cm.role
+       FROM channel_members cm
+       JOIN channels c ON c.id = cm.channel_id
+       WHERE cm.user_id = ?
+       ORDER BY CASE WHEN c.slug = 'demo' THEN 1 ELSE 0 END, c.name COLLATE NOCASE ASC`,
+    )
+    .bind(userId)
+    .all<{ id: string; slug: string; name: string; role: string }>();
+
+  return (results ?? []).map((row) => ({
+    id: row.id,
+    slug: row.slug,
+    name: row.name,
+    role: row.role || "admin",
+  }));
+}
+
 auth.get("/me", async (c) => {
   const user = await loadUserFromSession(c);
-  return c.json({ user });
+  if (!user) return c.json({ user: null, channels: [] });
+  const channels = await listChannelsForUser(c.env.DB, user.id);
+  return c.json({ user, channels });
 });
 
 auth.patch("/profile", async (c) => {
@@ -474,6 +497,45 @@ auth.get("/desktop-handoff", async (c) => {
     deepLink: `${DESKTOP_SCHEME}://oauth/callback?token=${encodeURIComponent(handoff)}`,
     user,
   });
+});
+
+/**
+ * Desktop app login entry: reuse existing browser Songbook session when present,
+ * otherwise start OAuth for the requested provider.
+ * Query: ?provider=google|naver&next=/me
+ */
+auth.get("/desktop-connect", async (c) => {
+  const nextPath = safeNextPath(c.req.query("next"));
+  const providerRaw = (c.req.query("provider") || "").toLowerCase();
+  const provider: OAuthProvider | null =
+    providerRaw === "google" || providerRaw === "naver" ? providerRaw : null;
+
+  const user = await loadUserFromSession(c);
+  if (user) {
+    if (user.needsProfileSetup) {
+      const q = new URLSearchParams({
+        next: nextPath,
+        client: "desktop",
+      });
+      return c.redirect(`/me/setup?${q}`);
+    }
+    const token =
+      getCookie(c, SESSION_COOKIE) || bearerToken(c.req.header("Authorization"));
+    if (token) {
+      console.log("[auth] desktop-connect reused browser session", { userId: user.id });
+      return c.html(desktopDoneHtml(token));
+    }
+  }
+
+  if (!provider) {
+    return c.redirect(`/?client=desktop&next=${encodeURIComponent(nextPath)}`);
+  }
+  if (!providerConfigured(c, provider)) {
+    return c.redirect(errorRedirect("not_configured"));
+  }
+
+  const { url } = await beginOAuth(c, provider, nextPath, "desktop");
+  return c.redirect(url);
 });
 
 auth.get("/status", (c) => {

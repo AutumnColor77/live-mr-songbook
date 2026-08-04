@@ -6,6 +6,13 @@ export type AuthUser = {
   needsProfileSetup: boolean;
 };
 
+export type UserChannel = {
+  id: string;
+  slug: string;
+  name: string;
+  role: string;
+};
+
 export type OAuthProvider = "google" | "naver";
 
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
@@ -38,13 +45,49 @@ function normalizeUser(raw: Partial<AuthUser> | null | undefined): AuthUser | nu
   };
 }
 
-export async function fetchMe(): Promise<AuthUser | null> {
+export async function fetchSession(): Promise<{
+  user: AuthUser;
+  channels: UserChannel[];
+} | null> {
   try {
-    const data = await fetchJson<{ user: AuthUser | null }>("/api/auth/me");
-    return normalizeUser(data.user);
+    const data = await fetchJson<{
+      user: AuthUser | null;
+      channels?: UserChannel[];
+    }>("/api/auth/me");
+    const user = normalizeUser(data.user);
+    if (!user) return null;
+    return {
+      user,
+      channels: Array.isArray(data.channels) ? data.channels : [],
+    };
   } catch {
     return null;
   }
+}
+
+export async function fetchMe(): Promise<AuthUser | null> {
+  const session = await fetchSession();
+  return session?.user ?? null;
+}
+
+export async function createChannel(input: {
+  slug: string;
+  name: string;
+}): Promise<UserChannel> {
+  const data = await fetchJson<{
+    channel: UserChannel & { createdAt?: number };
+  }>("/api/me/channels", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!data.channel?.slug) throw new Error("채널 생성에 실패했습니다.");
+  return {
+    id: data.channel.id,
+    slug: data.channel.slug,
+    name: data.channel.name,
+    role: data.channel.role || "admin",
+  };
 }
 
 export async function fetchAuthStatus(): Promise<{
@@ -63,7 +106,7 @@ export async function fetchAuthStatus(): Promise<{
 /** Sets OAuth state cookie, then returns provider authorize URL. */
 export async function startOAuthLogin(
   provider: OAuthProvider,
-  next = "/c/demo/admin",
+  next = "/me",
 ): Promise<string> {
   const qs = new URLSearchParams({ next });
   const data = await fetchJson<{ url: string }>(
@@ -73,11 +116,11 @@ export async function startOAuthLogin(
   return data.url;
 }
 
-export async function startGoogleLogin(next = "/c/demo/admin"): Promise<string> {
+export async function startGoogleLogin(next = "/me"): Promise<string> {
   return startOAuthLogin("google", next);
 }
 
-export async function startNaverLogin(next = "/c/demo/admin"): Promise<string> {
+export async function startNaverLogin(next = "/me"): Promise<string> {
   return startOAuthLogin("naver", next);
 }
 

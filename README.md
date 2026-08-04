@@ -72,7 +72,9 @@ npx wrangler secret put GOOGLE_CLIENT_SECRET
 |--------|------|------|
 | `GET` | `/api/auth/google` | Google OAuth 시작 (리다이렉트) |
 | `GET` | `/api/auth/google/callback` | OAuth 콜백 → 세션 쿠키 발급 |
-| `GET` | `/api/auth/me` | 현재 로그인 사용자 (`{ user }` 또는 `user: null`) |
+| `GET` | `/api/auth/me` | 현재 로그인 사용자 + 소속 채널 (`{ user, channels }`) |
+| `GET` | `/api/auth/desktop-connect` | 앱 로그인 진입 — 브라우저 세션 재사용 또는 OAuth (`?provider=&next=`) |
+| `GET` | `/api/auth/desktop-handoff` | 기존 세션 → 앱 deep-link 토큰 |
 | `GET` | `/api/auth/status` | `{ googleEnabled }` — OAuth 설정 여부 |
 | `POST` | `/api/auth/logout` | 세션 삭제 |
 
@@ -134,9 +136,16 @@ npx wrangler d1 create live-mr-songbook   # database_id → wrangler.toml
 npx wrangler secret put PLATFORM_ADMIN_TOKEN
 npx wrangler secret put GOOGLE_CLIENT_ID
 npx wrangler secret put GOOGLE_CLIENT_SECRET
+npx wrangler secret put NAVER_CLIENT_ID
+npx wrangler secret put NAVER_CLIENT_SECRET
 npm run db:migrate:remote
 npm run deploy
 ```
+
+프로덕션 콜백 URL을 Google/네이버 콘솔에 등록하세요.
+
+- `https://<worker>.workers.dev/api/auth/google/callback`
+- `https://<worker>.workers.dev/api/auth/naver/callback`
 
 ## Out of scope (next)
 

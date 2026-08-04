@@ -9,6 +9,7 @@ import requests from "./routes/requests";
 import admin from "./routes/admin";
 import platform from "./routes/platform";
 import authRoutes from "./routes/auth";
+import meRoutes from "./routes/me";
 
 const app = new Hono<AppEnv>();
 
@@ -23,6 +24,7 @@ app.use(
 app.get("/api/health", (c) => c.json({ ok: true, service: "live-mr-songbook" }));
 
 app.route("/api/auth", authRoutes);
+app.route("/api/me", meRoutes);
 app.route("/api/platform", platform);
 
 const channelApi = new Hono<AppEnv>();

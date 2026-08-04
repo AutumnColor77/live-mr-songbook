@@ -4,14 +4,13 @@ main = "./src/worker/index.ts"
 workers_dev = true
 preview_urls = true
 
-# Local: values from `.dev.vars` override these.
-# Production: wrangler secret put for GOOGLE_*/NAVER_*/PLATFORM_ADMIN_TOKEN
-[vars]
-PLATFORM_ADMIN_TOKEN = ""
-GOOGLE_CLIENT_ID = ""
-GOOGLE_CLIENT_SECRET = ""
-NAVER_CLIENT_ID = ""
-NAVER_CLIENT_SECRET = ""
+# Secrets (never commit values):
+#   npx wrangler secret put PLATFORM_ADMIN_TOKEN
+#   npx wrangler secret put GOOGLE_CLIENT_ID
+#   npx wrangler secret put GOOGLE_CLIENT_SECRET
+#   npx wrangler secret put NAVER_CLIENT_ID
+#   npx wrangler secret put NAVER_CLIENT_SECRET
+# Local: use `.dev.vars` instead.
 
 [[d1_databases]]
 binding = "DB"
