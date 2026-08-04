@@ -2,6 +2,10 @@ export type Bindings = {
   DB: D1Database;
   PLATFORM_ADMIN_TOKEN: string;
   ASSETS: Fetcher;
+  GOOGLE_CLIENT_ID?: string;
+  GOOGLE_CLIENT_SECRET?: string;
+  NAVER_CLIENT_ID?: string;
+  NAVER_CLIENT_SECRET?: string;
 };
 
 export type ChannelRow = {
@@ -10,6 +14,35 @@ export type ChannelRow = {
   name: string;
   admin_token_hash: string;
   created_at: number;
+};
+
+export type UserRow = {
+  id: string;
+  google_sub: string;
+  provider?: string;
+  provider_sub?: string | null;
+  email: string;
+  name: string;
+  picture: string;
+  profile_setup_done?: number;
+  created_at: number;
+  updated_at: number;
+};
+
+export type SessionRow = {
+  id: string;
+  user_id: string;
+  token_hash: string;
+  expires_at: number;
+  created_at: number;
+};
+
+export type AuthUser = {
+  id: string;
+  email: string;
+  name: string;
+  picture: string;
+  needsProfileSetup: boolean;
 };
 
 export type Variables = {

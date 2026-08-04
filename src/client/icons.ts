@@ -31,4 +31,8 @@ export const icons = {
       '<path d="M9 18V5l12-2v6"/><circle cx="6" cy="18" r="3"/><line x1="2" y1="2" x2="22" y2="22"/>',
       size,
     ),
+  google: (size = 18) =>
+    `<svg viewBox="0 0 24 24" width="${size}" height="${size}" aria-hidden="true"><path fill="#EA4335" d="M12 10.2v3.6h5.1c-.2 1.2-.9 2.3-1.9 3l3.1 2.4c1.8-1.7 2.9-4.1 2.9-7 0-.7-.1-1.3-.2-1.9H12z"/><path fill="#34A853" d="M6.6 14.3l-.5.4-2.2 1.7C5.6 19.1 8.6 21 12 21c2.4 0 4.4-.8 5.9-2.2l-3.1-2.4c-.8.6-1.9.9-2.8.9-2.2 0-4-1.5-4.7-3.5z"/><path fill="#4A90E2" d="M4 7.6C3.4 8.8 3 10.1 3 11.5s.4 2.7 1 3.9c0 .1 2.6-2 2.6-2-.2-.5-.3-1-.3-1.5s.1-1 .3-1.5L4 7.6z"/><path fill="#FBBC05" d="M12 5.7c1.3 0 2.5.5 3.4 1.3l2.6-2.6C16.4 2.9 14.4 2 12 2 8.6 2 5.6 3.9 4 6.9l2.7 2.1C7.9 7.1 9.8 5.7 12 5.7z"/></svg>`,
+  naver: (size = 18) =>
+    `<svg viewBox="0 0 24 24" width="${size}" height="${size}" aria-hidden="true"><rect width="24" height="24" rx="4" fill="#03C75A"/><path fill="#fff" d="M7 6.5h3.2l3.1 5.1V6.5H17v11h-3.2l-3.1-5.1v5.1H7V6.5z"/></svg>`,
 };

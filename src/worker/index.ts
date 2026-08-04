@@ -8,13 +8,21 @@ import queue from "./routes/queue";
 import requests from "./routes/requests";
 import admin from "./routes/admin";
 import platform from "./routes/platform";
+import authRoutes from "./routes/auth";
 
 const app = new Hono<AppEnv>();
 
-app.use("/api/*", cors());
+app.use(
+  "/api/*",
+  cors({
+    origin: (origin, c) => origin || new URL(c.req.url).origin,
+    credentials: true,
+  }),
+);
 
 app.get("/api/health", (c) => c.json({ ok: true, service: "live-mr-songbook" }));
 
+app.route("/api/auth", authRoutes);
 app.route("/api/platform", platform);
 
 const channelApi = new Hono<AppEnv>();

@@ -514,6 +514,13 @@ button,
   font-size: 0.9rem;
   cursor: pointer;
   white-space: nowrap;
+  text-decoration: none;
+  box-sizing: border-box;
+}
+
+a.primary-btn,
+a.secondary-btn {
+  color: inherit;
 }
 
 .primary-btn {
@@ -665,6 +672,18 @@ button,
 
 .modal-overlay[hidden] {
   display: none;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .modal-content {

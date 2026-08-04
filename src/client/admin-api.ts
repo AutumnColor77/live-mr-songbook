@@ -1,21 +1,5 @@
 import type { SongRequest, StatusResponse } from "./types";
 
-function tokenKey(slug: string): string {
-  return `songbook-admin-token:${slug}`;
-}
-
-export function getAdminToken(slug: string): string | null {
-  return sessionStorage.getItem(tokenKey(slug));
-}
-
-export function setAdminToken(slug: string, token: string): void {
-  sessionStorage.setItem(tokenKey(slug), token);
-}
-
-export function clearAdminToken(slug: string): void {
-  sessionStorage.removeItem(tokenKey(slug));
-}
-
 export class AdminAuthError extends Error {
   constructor(message = "Unauthorized") {
     super(message);
@@ -32,20 +16,19 @@ async function adminFetch<T>(
   path: string,
   init: RequestInit = {},
 ): Promise<T> {
-  const token = getAdminToken(slug);
-  if (!token) throw new AdminAuthError("Admin token missing");
-
   const headers = new Headers(init.headers);
-  headers.set("Authorization", `Bearer ${token}`);
   if (init.body && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
 
-  const res = await fetch(`${adminBase(slug)}${path}`, { ...init, headers });
+  const res = await fetch(`${adminBase(slug)}${path}`, {
+    ...init,
+    headers,
+    credentials: "include",
+  });
   const data = (await res.json().catch(() => ({}))) as T & { error?: string };
 
   if (res.status === 401) {
-    clearAdminToken(slug);
     throw new AdminAuthError(data.error ?? "Unauthorized");
   }
   if (!res.ok) {
@@ -54,8 +37,8 @@ async function adminFetch<T>(
   return data;
 }
 
-/** Verify token by hitting a cheap admin endpoint. */
-export async function verifyAdminToken(slug: string): Promise<void> {
+/** Verify Google session has channel admin access. */
+export async function verifyAdminAccess(slug: string): Promise<void> {
   await adminFetch<{ requests: SongRequest[] }>(slug, "/requests");
 }
 

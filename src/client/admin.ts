@@ -1,17 +1,25 @@
 import {
   AdminAuthError,
-  clearAdminToken,
   clearQueue,
   fetchAdminRequests,
   fetchPublicStatus,
-  getAdminToken,
   patchAdminSettings,
   patchRequestStatus,
-  setAdminToken,
-  verifyAdminToken,
+  verifyAdminAccess,
 } from "./admin-api";
+import {
+  fetchAuthStatus,
+  fetchMe,
+  logout,
+  type AuthUser,
+} from "./auth-api";
 import { $, escapeHtml } from "./dom";
 import { icons } from "./icons";
+import {
+  bindLoginPicker,
+  loginButtonHtml,
+  loginPickerOverlayHtml,
+} from "./login-picker";
 import type { SongRequest, StatusResponse } from "./types";
 
 type Theme = "dark" | "light" | "pink" | "sky";
@@ -40,28 +48,56 @@ function nowPlayingLabel(status: StatusResponse | null): string {
   return np ? `${np.title} - ${np.artist}` : "현재 재생 중인 곡이 없습니다.";
 }
 
+function consumeAuthOk(): string {
+  const params = new URLSearchParams(location.search);
+  const auth = params.get("auth");
+  if (!auth) return "";
+  history.replaceState({}, "", location.pathname);
+  if (auth === "ok") return "로그인되었습니다.";
+  if (auth === "error") {
+    const reason = params.get("reason") ?? "unknown";
+    return `로그인 실패: ${reason}`;
+  }
+  return "";
+}
+
 export async function mountAdmin(root: HTMLElement, slug: string): Promise<void> {
   applyTheme(currentTheme());
   document.title = `운영 · ${slug} · Live MR Songbook`;
 
-  const token = getAdminToken(slug);
-  if (!token) {
-    mountLogin(root, slug);
+  const notice = consumeAuthOk();
+  const [user, status] = await Promise.all([fetchMe(), fetchAuthStatus()]);
+  if (!user) {
+    mountLogin(root, slug, notice.startsWith("로그인 실패") ? notice : "", null, status);
     return;
   }
 
   try {
-    await verifyAdminToken(slug);
+    await verifyAdminAccess(slug);
   } catch {
-    clearAdminToken(slug);
-    mountLogin(root, slug, "토큰이 유효하지 않습니다. 다시 입력해 주세요.");
+    mountLogin(
+      root,
+      slug,
+      "이 채널 운영 권한이 없습니다. 다른 계정으로 다시 로그인해 주세요.",
+      user,
+      status,
+    );
     return;
   }
 
-  await mountDashboard(root, slug);
+  await mountDashboard(root, slug, user, notice.startsWith("로그인되었습니다") ? notice : "");
 }
 
-function mountLogin(root: HTMLElement, slug: string, errorMsg = ""): void {
+function mountLogin(
+  root: HTMLElement,
+  slug: string,
+  errorMsg = "",
+  user: AuthUser | null = null,
+  providers: { googleEnabled: boolean; naverEnabled: boolean } = {
+    googleEnabled: true,
+    naverEnabled: true,
+  },
+): void {
   root.innerHTML = `
     <div class="relative z-10 min-h-screen flex flex-col">
       <header class="topbar sticky top-0 z-30">
@@ -71,52 +107,60 @@ function mountLogin(root: HTMLElement, slug: string, errorMsg = ""): void {
         </div>
       </header>
       <main class="flex-1 flex items-center justify-center px-4 py-12">
-        <form id="admin-login-form" class="panel max-w-md w-full p-8 space-y-5">
-          <div class="text-center space-y-1">
+        <div class="panel max-w-md w-full p-8 space-y-5 text-center">
+          <div class="space-y-1">
             <p class="modal-eyebrow">Streamer Admin</p>
             <h1 class="text-xl font-extrabold text-main">채널 운영 로그인</h1>
             <p class="text-sm text-muted">/c/${escapeHtml(slug)}</p>
           </div>
           ${
             errorMsg
-              ? `<p class="text-sm font-semibold text-center" style="color:#f87171">${escapeHtml(errorMsg)}</p>`
+              ? `<p class="text-sm font-semibold" style="color:#f87171">${escapeHtml(errorMsg)}</p>`
               : ""
           }
-          <div class="space-y-2">
-            <label class="text-xs font-extrabold text-dim tracking-wide" for="admin-token">채널 Admin Token</label>
-            <input id="admin-token" type="password" class="cm-input" autocomplete="current-password" placeholder="채널 관리 토큰" required />
-          </div>
-          <button type="submit" class="primary-btn w-full" id="admin-login-btn">로그인</button>
-          <p class="text-xs text-dim text-center leading-relaxed">
-            토큰은 이 브라우저 탭 세션에만 저장됩니다.
+          ${
+            user
+              ? `<p class="text-xs text-dim">${escapeHtml(user.email)} 로 로그인됨</p>
+                 <button id="admin-logout" type="button" class="secondary-btn w-full">다른 계정으로</button>`
+              : ""
+          }
+          ${loginButtonHtml(providers)}
+          <p class="text-xs text-dim leading-relaxed">
+            로그인하면 이 채널 운영 화면으로 이동합니다.
           </p>
-        </form>
+        </div>
       </main>
+      ${loginPickerOverlayHtml(providers)}
       <div id="toast" class="toast" hidden></div>
     </div>
   `;
 
-  const form = $("#admin-login-form") as HTMLFormElement;
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const input = $("#admin-token") as HTMLInputElement;
-    const btn = $("#admin-login-btn") as HTMLButtonElement;
-    const value = input.value.trim();
-    if (!value) return;
-    btn.disabled = true;
-    setAdminToken(slug, value);
-    try {
-      await verifyAdminToken(slug);
-      await mountAdmin(root, slug);
-    } catch (err) {
-      clearAdminToken(slug);
-      const msg = err instanceof Error ? err.message : "로그인 실패";
-      mountLogin(root, slug, msg);
-    }
-  });
+  const toast = $("#toast");
+  function showToast(message: string) {
+    toast.textContent = message;
+    toast.hidden = false;
+    window.setTimeout(() => {
+      toast.hidden = true;
+    }, 2400);
+  }
+
+  bindLoginPicker({ next: `/c/${slug}/admin`, onToast: showToast });
+
+  const logoutBtn = document.querySelector("#admin-logout");
+  if (logoutBtn) {
+    logoutBtn.addEventListener("click", async () => {
+      await logout();
+      mountLogin(root, slug, "", null, providers);
+    });
+  }
 }
 
-async function mountDashboard(root: HTMLElement, slug: string): Promise<void> {
+async function mountDashboard(
+  root: HTMLElement,
+  slug: string,
+  user: AuthUser,
+  notice = "",
+): Promise<void> {
   root.innerHTML = `
     <div class="relative z-10 min-h-screen flex flex-col">
       <header class="topbar sticky top-0 z-30">
@@ -129,6 +173,14 @@ async function mountDashboard(root: HTMLElement, slug: string): Promise<void> {
             </div>
           </div>
           <div class="flex items-center gap-2 shrink-0">
+            <a href="/me?next=${encodeURIComponent(`/c/${slug}/admin`)}" class="flex items-center gap-2 min-w-0 rounded-lg px-1.5 py-1 hover:bg-[var(--surface-3)] transition-colors" title="프로필 수정">
+              ${
+                user.picture
+                  ? `<img src="${escapeHtml(user.picture)}" alt="" class="w-8 h-8 rounded-full border border-glass-border object-cover shrink-0" referrerpolicy="no-referrer" />`
+                  : `<span class="w-8 h-8 rounded-full bg-[var(--surface-3)] flex items-center justify-center text-xs font-extrabold text-main shrink-0">${escapeHtml((user.name || user.email).slice(0, 1).toUpperCase())}</span>`
+              }
+              <span class="text-xs text-dim hidden md:inline truncate max-w-[140px]" title="${escapeHtml(user.email)}">${escapeHtml(user.name || user.email)}</span>
+            </a>
             <a href="/c/${escapeHtml(slug)}" class="secondary-btn btn-sm hidden sm:inline-flex" target="_blank" rel="noopener">공개 페이지</a>
             <button id="theme-btn" type="button" class="icon-btn" title="테마 변경" aria-label="테마 변경">${icons.palette(18)}</button>
             <button id="admin-logout" type="button" class="secondary-btn btn-sm">로그아웃</button>
@@ -137,6 +189,11 @@ async function mountDashboard(root: HTMLElement, slug: string): Promise<void> {
       </header>
 
       <main class="flex-1 w-full max-w-3xl mx-auto px-4 sm:px-6 py-5 space-y-4 pb-10">
+        ${
+          notice
+            ? `<p class="text-sm font-semibold text-center" style="color:#4ade80">${escapeHtml(notice)}</p>`
+            : ""
+        }
         <section class="panel p-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <p class="text-xs font-extrabold text-dim tracking-wide mb-1">신청 접수</p>
@@ -148,25 +205,24 @@ async function mountDashboard(root: HTMLElement, slug: string): Promise<void> {
         <section class="panel p-5">
           <div class="flex items-center gap-3">
             <span class="dock-art">${icons.disc(22)}</span>
-            <div class="min-w-0">
+            <div class="min-w-0 flex-1">
               <p class="dock-label">Now Playing</p>
               <p id="admin-now-playing" class="song-name text-sm">현재 재생 중인 곡이 없습니다.</p>
             </div>
           </div>
         </section>
 
-        <section class="space-y-3">
-          <div class="flex items-center justify-between px-1 gap-2">
+        <section class="panel p-5">
+          <div class="flex items-center justify-between gap-3 mb-4">
             <div class="flex items-center gap-2">
-              <h2 class="text-sm font-extrabold text-muted tracking-wide">대기열</h2>
+              <h2 class="text-sm font-extrabold text-main">대기열</h2>
               <span id="admin-queue-count" class="count-badge">0</span>
             </div>
-            <button id="queue-clear" type="button" class="secondary-btn btn-sm">초기화</button>
+            <button id="queue-clear" type="button" class="secondary-btn btn-sm">대기열 비우기</button>
           </div>
           <div id="admin-queue-list" class="space-y-2"></div>
         </section>
       </main>
-
       <div id="toast" class="toast" hidden></div>
     </div>
   `;
@@ -183,23 +239,19 @@ async function mountDashboard(root: HTMLElement, slug: string): Promise<void> {
     window.clearTimeout(toastTimer);
     toastTimer = window.setTimeout(() => {
       toast.hidden = true;
-    }, 2200);
+    }, 2400);
   }
 
   function render() {
-    const accepting = status?.acceptingRequests !== false;
     $("#admin-channel-name").textContent = status?.channel?.name ?? slug;
-    $("#accepting-label").textContent = accepting ? "신청 가능" : "신청 마감";
-    const toggle = $("#accepting-toggle") as HTMLButtonElement;
-    toggle.textContent = accepting ? "마감하기" : "열기";
-    toggle.className = accepting ? "secondary-btn btn-sm" : "primary-btn btn-sm";
-
+    $("#accepting-label").textContent = status?.acceptingRequests
+      ? "신청 받는 중"
+      : "신청 마감";
     $("#admin-now-playing").textContent = nowPlayingLabel(status);
 
     const active = requests
       .filter((r) => r.status === "pending" || r.status === "playing")
       .sort((a, b) => {
-        // Playing first, then FIFO (oldest request = #1)
         if (a.status === "playing" && b.status !== "playing") return -1;
         if (b.status === "playing" && a.status !== "playing") return 1;
         return a.createdAt - b.createdAt;
@@ -255,7 +307,6 @@ async function mountDashboard(root: HTMLElement, slug: string): Promise<void> {
       render();
     } catch (err) {
       if (err instanceof AdminAuthError) {
-        clearAdminToken(slug);
         mountLogin(root, slug, "세션이 만료되었습니다. 다시 로그인해 주세요.");
         return;
       }
@@ -263,8 +314,8 @@ async function mountDashboard(root: HTMLElement, slug: string): Promise<void> {
     }
   }
 
-  $("#admin-logout").addEventListener("click", () => {
-    clearAdminToken(slug);
+  $("#admin-logout").addEventListener("click", async () => {
+    await logout();
     mountLogin(root, slug);
   });
 
@@ -282,6 +333,10 @@ async function mountDashboard(root: HTMLElement, slug: string): Promise<void> {
       showToast(next ? "신청을 열었습니다." : "신청을 마감했습니다.");
       await refresh();
     } catch (err) {
+      if (err instanceof AdminAuthError) {
+        mountLogin(root, slug, "세션이 만료되었습니다. 다시 로그인해 주세요.");
+        return;
+      }
       showToast(err instanceof Error ? err.message : "설정 변경 실패");
     } finally {
       busy = false;
@@ -303,7 +358,6 @@ async function mountDashboard(root: HTMLElement, slug: string): Promise<void> {
       await refresh();
     } catch (err) {
       if (err instanceof AdminAuthError) {
-        clearAdminToken(slug);
         mountLogin(root, slug, "세션이 만료되었습니다. 다시 로그인해 주세요.");
         return;
       }
@@ -327,6 +381,10 @@ async function mountDashboard(root: HTMLElement, slug: string): Promise<void> {
       showToast(labels[act]);
       await refresh();
     } catch (err) {
+      if (err instanceof AdminAuthError) {
+        mountLogin(root, slug, "세션이 만료되었습니다. 다시 로그인해 주세요.");
+        return;
+      }
       showToast(err instanceof Error ? err.message : "처리 실패");
     } finally {
       busy = false;

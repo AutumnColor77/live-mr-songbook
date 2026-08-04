@@ -4,6 +4,15 @@ main = "./src/worker/index.ts"
 workers_dev = true
 preview_urls = true
 
+# Local: values from `.dev.vars` override these.
+# Production: wrangler secret put for GOOGLE_*/NAVER_*/PLATFORM_ADMIN_TOKEN
+[vars]
+PLATFORM_ADMIN_TOKEN = ""
+GOOGLE_CLIENT_ID = ""
+GOOGLE_CLIENT_SECRET = ""
+NAVER_CLIENT_ID = ""
+NAVER_CLIENT_SECRET = ""
+
 [[d1_databases]]
 binding = "DB"
 database_name = "live-mr-songbook"
@@ -13,3 +22,5 @@ migrations_dir = "migrations"
 [assets]
 not_found_handling = "single-page-application"
 binding = "ASSETS"
+# Browser navigations (OAuth callback) must hit the Worker, not index.html
+run_worker_first = ["/api/*"]

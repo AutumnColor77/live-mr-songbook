@@ -30,23 +30,51 @@ Live MR Manager와는 **별도 리포**입니다. 스트리머마다 채널(`slu
 
 ```bash
 npm install
-cp .dev.vars.example .dev.vars   # PLATFORM_ADMIN_TOKEN=dev-platform-token
+cp .dev.vars.example .dev.vars   # PLATFORM_ADMIN_TOKEN + (optional) Google OAuth
 npm run db:migrate:local
 npm run dev
 ```
 
-- 홈: http://localhost:5173/
+- 홈: http://localhost:5173/ (Google 로그인)
 - 데모 시청자: http://localhost:5173/c/demo
 - 데모 운영: http://localhost:5173/c/demo/admin (토큰 `demo-channel-token`)
+
+### Google OAuth 설정
+
+1. [Google Cloud Console](https://console.cloud.google.com/apis/credentials)에서 OAuth 2.0 클라이언트(웹) 생성
+2. 승인된 리디렉션 URI 추가:
+   - 로컬: `http://localhost:5173/api/auth/google/callback`
+   - 프로덕션: `https://live-mr-songbook.boohun2771.workers.dev/api/auth/google/callback`
+3. `.dev.vars`에 `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` 입력
+4. 프로덕션은 시크릿으로 등록:
+
+```bash
+npx wrangler secret put GOOGLE_CLIENT_ID
+npx wrangler secret put GOOGLE_CLIENT_SECRET
+```
+
+값이 비어 있으면 홈의 Google 로그인 버튼은 503을 반환합니다.
 
 ## Multi-tenant model
 
 - **channels**: `slug`, `name`, `admin_token_hash` (SHA-256)
 - **songs / requests / settings**: `channel_id` 스코프
+- **users / sessions**: Google 계정 로그인 (HttpOnly 쿠키 세션)
 - 시청자: 로그인 없음
-- 스트리머: 채널별 Bearer 토큰 (계정 로그인은 이후)
+- 스트리머: Google 로그인 → 데모 채널 운영 (`/c/demo/admin`). 채널 Admin Token은 API 폴백용
+- 로그인 성공 기본 이동: `/c/demo/admin`
 
 ## API
+
+### Auth (Google)
+
+| Method | Path | 설명 |
+|--------|------|------|
+| `GET` | `/api/auth/google` | Google OAuth 시작 (리다이렉트) |
+| `GET` | `/api/auth/google/callback` | OAuth 콜백 → 세션 쿠키 발급 |
+| `GET` | `/api/auth/me` | 현재 로그인 사용자 (`{ user }` 또는 `user: null`) |
+| `GET` | `/api/auth/status` | `{ googleEnabled }` — OAuth 설정 여부 |
+| `POST` | `/api/auth/logout` | 세션 삭제 |
 
 ### Public (per channel)
 
@@ -90,7 +118,8 @@ curl -X POST https://live-mr-songbook.boohun2771.workers.dev/api/platform/channe
 
 - `/c/:slug` — 시청자: 검색·카테고리·신청·대기열·NOW PLAYING
 - `/c/:slug/admin` — 스트리머 운영: 신청 on/off, 대기열 재생/완료/거절
-- `/` — 랜딩(데모 시청자·운영 링크)
+- `/` — 랜딩(Google 로그인, 데모 링크)
+- `/me` — 로그인 후 계정 화면 (다음 단계 CTA)
 - 테마 전환 (다크 / 라이트 / 핑크 / 스카이)
 
 ## Design
@@ -103,13 +132,17 @@ Live MR Manager 톤앤매너 + 브랜드 에셋(`public/icon-*.png`, `logo-on-*.
 npx wrangler login
 npx wrangler d1 create live-mr-songbook   # database_id → wrangler.toml
 npx wrangler secret put PLATFORM_ADMIN_TOKEN
+npx wrangler secret put GOOGLE_CLIENT_ID
+npx wrangler secret put GOOGLE_CLIENT_SECRET
 npm run db:migrate:remote
 npm run deploy
 ```
 
 ## Out of scope (next)
 
-- 스트리머/시청자 계정 로그인
+- 채널별 소유권 UI (비-demo 채널 멤버 초대)
+- Manager 앱 내 deep-link 세션 동기화
+- 시청자 계정 로그인
 - 커스텀 도메인, Companion 링크
 - Live MR Manager Push/Pull
 - Durable Objects / WebSocket

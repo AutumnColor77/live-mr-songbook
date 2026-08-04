@@ -1,6 +1,15 @@
 import "./style.css";
 import { mountAdmin } from "./admin";
 import {
+  exchangeOAuthCode,
+  fetchAuthStatus,
+  fetchDesktopHandoff,
+  fetchMe,
+  logout,
+  type AuthUser,
+  type OAuthProvider,
+} from "./auth-api";
+import {
   fetchQueue,
   fetchSongs,
   fetchStatus,
@@ -9,6 +18,15 @@ import {
 } from "./api";
 import { $, escapeHtml } from "./dom";
 import { icons } from "./icons";
+import {
+  bindLoginPicker,
+  loginButtonHtml,
+  loginPickerOverlayHtml,
+} from "./login-picker";
+import {
+  bindProfileEditor,
+  profileEditorFieldsHtml,
+} from "./profile-editor";
 import type { Song, SongRequest, StatusResponse } from "./types";
 
 const CATEGORIES = ["ALL", "KPOP", "POP", "JPOP", "OST"] as const;
@@ -51,8 +69,166 @@ function parseChannelPath(): { slug: string; admin: boolean } | null {
   return { slug, admin: (match[2] ?? "").toLowerCase() === "admin" };
 }
 
-function mountLanding() {
+function authErrorNotice(reason: string): string {
+  const messages: Record<string, string> = {
+    not_configured: "소셜 로그인(OAuth) 설정이 필요합니다.",
+    invalid_state: "로그인 세션이 만료되었습니다. 다시 시도해 주세요.",
+    missing_code: "인증 코드가 없습니다. 다시 시도해 주세요.",
+    token_exchange:
+      "토큰 교환에 실패했습니다. Client Secret·콜백 URI를 확인하세요.",
+    userinfo: "프로필을 가져오지 못했습니다.",
+    access_denied: "로그인이 취소되었거나 앱 접근이 거부되었습니다.",
+    redirect_uri_mismatch: "콜백 URI가 개발자 콘솔 설정과 다릅니다.",
+    server: "서버 오류로 로그인에 실패했습니다.",
+  };
+  return messages[reason] ?? `로그인에 실패했습니다. (${reason})`;
+}
+
+function consumeAuthQuery(): { notice: string; ok: boolean } {
+  const params = new URLSearchParams(location.search);
+  const authStatus = params.get("auth");
+  let notice = "";
+  let ok = false;
+  if (authStatus === "ok") {
+    notice = "로그인되었습니다.";
+    ok = true;
+  } else if (authStatus === "error") {
+    notice = authErrorNotice(params.get("reason") ?? "unknown");
+  }
+  if (authStatus) {
+    history.replaceState({}, "", location.pathname);
+  }
+  return { notice, ok };
+}
+
+async function mountAccount(root: HTMLElement, user: AuthUser, notice = ""): Promise<void> {
   applyTheme(currentTheme());
+  document.title = "내 계정 · Live MR Songbook";
+
+  const nextPath = (() => {
+    const raw = new URLSearchParams(location.search).get("next") || "";
+    if (!raw.startsWith("/") || raw.startsWith("//") || raw.includes("://")) return "";
+    return raw;
+  })();
+
+  root.innerHTML = `
+    <div class="relative z-10 min-h-screen flex flex-col">
+      <header class="topbar sticky top-0 z-30">
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
+          <a href="/" class="min-w-0">
+            <img id="logo-lockup" class="logo-lockup" src="${logoSrc(currentTheme())}" width="480" height="120" alt="Live MR SongBook" />
+          </a>
+          <div class="flex items-center gap-2 shrink-0">
+            <button id="theme-btn" type="button" class="icon-btn" title="테마 변경" aria-label="테마 변경">${icons.palette(18)}</button>
+            <button id="logout-btn" type="button" class="secondary-btn btn-sm">로그아웃</button>
+          </div>
+        </div>
+      </header>
+      <main class="flex-1 flex items-center justify-center px-4 py-12">
+        <form id="profile-edit-form" class="panel max-w-md w-full p-8 space-y-5 text-center">
+          <div class="space-y-1">
+            <p class="modal-eyebrow">Account</p>
+            <h1 class="text-xl font-extrabold text-main">프로필 수정</h1>
+            <p class="text-xs text-dim truncate">${escapeHtml(user.email)}</p>
+          </div>
+          ${
+            notice
+              ? `<p id="profile-notice" class="text-sm font-semibold" style="color:${notice.startsWith("로그인") || notice.startsWith("저장") ? "#4ade80" : "#f87171"}">${escapeHtml(notice)}</p>`
+              : `<p id="profile-notice" class="text-sm font-semibold" hidden></p>`
+          }
+          ${profileEditorFieldsHtml(user)}
+          <button type="submit" class="primary-btn w-full">저장</button>
+          <div class="border-t border-glass-border pt-5 space-y-3">
+            ${
+              nextPath
+                ? `<a href="${escapeHtml(nextPath)}" class="primary-btn w-full">돌아가기</a>`
+                : `<a href="/c/demo/admin" class="primary-btn w-full">데모 채널 운영 화면</a>`
+            }
+            <a href="/" class="secondary-btn w-full">홈으로</a>
+          </div>
+        </form>
+      </main>
+      <div id="toast" class="toast" hidden></div>
+    </div>
+  `;
+
+  $("#theme-btn").addEventListener("click", () => {
+    const next = THEMES[(THEMES.indexOf(currentTheme()) + 1) % THEMES.length]!;
+    applyTheme(next);
+  });
+
+  $("#logout-btn").addEventListener("click", async () => {
+    await logout();
+    location.assign("/");
+  });
+
+  bindProfileEditor({
+    initial: user,
+    form: $("#profile-edit-form") as HTMLFormElement,
+    onSaved: (saved) => {
+      const noticeEl = document.querySelector<HTMLElement>("#profile-notice");
+      if (noticeEl) {
+        noticeEl.hidden = false;
+        noticeEl.style.color = "#4ade80";
+        noticeEl.textContent = "저장되었습니다.";
+      }
+      const submitBtn = document.querySelector<HTMLButtonElement>(
+        '#profile-edit-form button[type="submit"]',
+      );
+      if (submitBtn) submitBtn.disabled = false;
+      if (nextPath) {
+        const sep = nextPath.includes("?") ? "&" : "?";
+        location.assign(`${nextPath}${sep}auth=ok`);
+        return;
+      }
+      void mountAccount(root, saved, "저장되었습니다.");
+    },
+  });
+}
+
+function mountLanding(
+  user: AuthUser | null = null,
+  notice = "",
+  providers: { googleEnabled: boolean; naverEnabled: boolean } = {
+    googleEnabled: false,
+    naverEnabled: false,
+  },
+) {
+  applyTheme(currentTheme());
+
+  function showToast(message: string) {
+    const toast = document.querySelector<HTMLElement>("#toast");
+    if (!toast) return;
+    toast.textContent = message;
+    toast.hidden = false;
+    window.setTimeout(() => {
+      toast.hidden = true;
+    }, 2400);
+  }
+
+  const authBlock = user
+    ? `
+      <a href="/me" class="flex items-center gap-3 justify-center rounded-xl border border-glass-border bg-[var(--surface-2)] px-3 py-3 hover:bg-[var(--surface-3)] transition-colors">
+        ${
+          user.picture
+            ? `<img src="${escapeHtml(user.picture)}" alt="" class="w-10 h-10 rounded-full border border-glass-border object-cover" referrerpolicy="no-referrer" />`
+            : `<span class="w-10 h-10 rounded-full bg-[var(--surface-3)] flex items-center justify-center text-sm font-extrabold text-main">${escapeHtml((user.name || user.email).slice(0, 1).toUpperCase())}</span>`
+        }
+        <div class="min-w-0 text-left flex-1">
+          <p class="text-sm font-extrabold text-main truncate">${escapeHtml(user.name || "사용자")}</p>
+          <p class="text-xs text-dim truncate">프로필 수정</p>
+        </div>
+      </a>
+      <a href="/c/demo/admin" class="primary-btn w-full">데모 운영 화면</a>
+      <button id="logout-btn" type="button" class="secondary-btn w-full">로그아웃</button>
+    `
+    : `
+      ${loginButtonHtml(providers)}
+      <p class="text-xs text-dim text-center leading-relaxed">
+        로그인하면 데모 채널 운영 화면으로 이동합니다.
+      </p>
+    `;
+
   app!.innerHTML = `
     <div class="relative z-10 min-h-screen flex flex-col">
       <header class="topbar sticky top-0 z-30">
@@ -79,20 +255,91 @@ function mountLanding() {
               스트리머별 노래책 URL로 접속해 신청하세요.
             </p>
           </div>
-          <a href="/c/demo" class="primary-btn w-full">데모 노래책 열기</a>
-          <a href="/c/demo/admin" class="secondary-btn w-full">데모 운영 화면</a>
+          ${
+            notice
+              ? `<p class="text-sm font-semibold" style="color:${notice.startsWith("로그인") || notice.startsWith("로그아웃") ? "#4ade80" : "#f87171"}">${escapeHtml(notice)}</p>`
+              : ""
+          }
+          ${authBlock}
+          <div class="border-t border-glass-border pt-5 space-y-3">
+            <a href="/c/demo" class="primary-btn w-full">데모 노래책 열기</a>
+            <a href="/c/demo/admin" class="secondary-btn w-full">데모 운영 화면</a>
+          </div>
           <p class="text-xs text-dim leading-relaxed">
             시청자 <code class="text-accent">/c/채널슬러그</code><br />
             운영 <code class="text-accent">/c/채널슬러그/admin</code>
           </p>
         </div>
       </main>
+      ${loginPickerOverlayHtml(providers)}
+      <div id="toast" class="toast" hidden></div>
     </div>
   `;
 
   $("#theme-btn").addEventListener("click", () => {
     const next = THEMES[(THEMES.indexOf(currentTheme()) + 1) % THEMES.length]!;
     applyTheme(next);
+  });
+
+  const logoutBtn = document.querySelector("#logout-btn");
+  if (logoutBtn) {
+    logoutBtn.addEventListener("click", async () => {
+      await logout();
+      mountLanding(null, "로그아웃되었습니다.", providers);
+    });
+  }
+
+  bindLoginPicker({ next: "/c/demo/admin", onToast: showToast });
+}
+
+async function mountProfileSetup(root: HTMLElement, user: AuthUser): Promise<void> {
+  applyTheme(currentTheme());
+  document.title = "프로필 설정 · Live MR Songbook";
+
+  const params = new URLSearchParams(location.search);
+  const nextPath = (() => {
+    const raw = params.get("next") || "/c/demo/admin";
+    if (!raw.startsWith("/") || raw.startsWith("//") || raw.includes("://")) {
+      return "/c/demo/admin";
+    }
+    return raw;
+  })();
+  const isDesktop = params.get("client") === "desktop";
+
+  root.innerHTML = `
+    <div class="relative z-10 min-h-screen flex flex-col">
+      <header class="topbar sticky top-0 z-30">
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
+          <img id="logo-lockup" class="logo-lockup" src="${logoSrc(currentTheme())}" width="480" height="120" alt="Live MR SongBook" />
+        </div>
+      </header>
+      <main class="flex-1 flex items-center justify-center px-4 py-12">
+        <form id="profile-setup-form" class="panel max-w-md w-full p-8 space-y-5 text-center">
+          <div class="space-y-1">
+            <p class="modal-eyebrow">Welcome</p>
+            <h1 class="text-xl font-extrabold text-main">프로필 설정</h1>
+            <p class="text-sm text-muted">닉네임과 프로필 사진을 정해 주세요.</p>
+          </div>
+          ${profileEditorFieldsHtml(user)}
+          <button type="submit" class="primary-btn w-full">시작하기</button>
+        </form>
+      </main>
+      <div id="toast" class="toast" hidden></div>
+    </div>
+  `;
+
+  bindProfileEditor({
+    initial: user,
+    form: $("#profile-setup-form") as HTMLFormElement,
+    onSaved: async () => {
+      if (isDesktop) {
+        const { deepLink } = await fetchDesktopHandoff();
+        location.replace(deepLink);
+        return;
+      }
+      const sep = nextPath.includes("?") ? "&" : "?";
+      location.replace(`${nextPath}${sep}auth=ok`);
+    },
   });
 }
 
@@ -531,9 +778,90 @@ async function mountSongbook(slug: string) {
   window.setInterval(() => void refreshQueueAndStatus(), 5000);
 }
 
+async function handleOAuthCallbackFallback(): Promise<boolean> {
+  const match = /^\/api\/auth\/(google|naver)\/callback\/?$/.exec(location.pathname);
+  if (!match) return false;
+  const provider = match[1] as OAuthProvider;
+
+  applyTheme(currentTheme());
+  const params = new URLSearchParams(location.search);
+  const error = params.get("error");
+  if (error) {
+    location.replace(`/?auth=error&reason=${encodeURIComponent(error)}`);
+    return true;
+  }
+
+  const code = params.get("code");
+  const state = params.get("state");
+  app!.innerHTML = `
+    <div class="relative z-10 min-h-screen flex items-center justify-center px-4">
+      <div class="panel max-w-md w-full p-8 text-center space-y-3">
+        <p class="modal-eyebrow">Auth</p>
+        <h1 class="text-lg font-extrabold text-main">로그인 처리 중…</h1>
+        <p class="text-sm text-muted">잠시만 기다려 주세요.</p>
+      </div>
+    </div>
+  `;
+
+  if (!code || !state) {
+    location.replace("/?auth=error&reason=missing_code");
+    return true;
+  }
+
+  const result = await exchangeOAuthCode(provider, code, state);
+  if (!result.ok) {
+    location.replace(`/?auth=error&reason=${encodeURIComponent(result.reason)}`);
+    return true;
+  }
+  if ("deepLink" in result && result.deepLink) {
+    location.replace(result.deepLink);
+    return true;
+  }
+  location.replace(result.redirect);
+  return true;
+}
+
 async function boot() {
+  if (await handleOAuthCallbackFallback()) return;
+
+  if (location.pathname === "/me/setup" || location.pathname === "/me/setup/") {
+    const user = await fetchMe();
+    if (!user) {
+      location.replace("/?auth=error&reason=access_denied");
+      return;
+    }
+    if (!user.needsProfileSetup) {
+      const next = new URLSearchParams(location.search).get("next") || "/c/demo/admin";
+      location.replace(next.startsWith("/") ? next : "/c/demo/admin");
+      return;
+    }
+    await mountProfileSetup(app!, user);
+    return;
+  }
+
+  if (location.pathname === "/me" || location.pathname === "/me/") {
+    const { notice } = consumeAuthQuery();
+    const user = await fetchMe();
+    if (!user) {
+      location.replace("/?auth=error&reason=access_denied");
+      return;
+    }
+    if (user.needsProfileSetup) {
+      location.replace("/me/setup?next=/me");
+      return;
+    }
+    await mountAccount(app!, user, notice);
+    return;
+  }
+
   if (location.pathname === "/" || location.pathname === "") {
-    mountLanding();
+    const { notice } = consumeAuthQuery();
+    const [user, status] = await Promise.all([fetchMe(), fetchAuthStatus()]);
+    if (user?.needsProfileSetup) {
+      location.replace("/me/setup?next=/c/demo/admin");
+      return;
+    }
+    mountLanding(user, notice, { googleEnabled: status.googleEnabled, naverEnabled: status.naverEnabled });
     return;
   }
 
@@ -544,6 +872,11 @@ async function boot() {
       return;
     }
     if (parsed.admin) {
+      const user = await fetchMe();
+      if (user?.needsProfileSetup) {
+        location.replace(`/me/setup?next=${encodeURIComponent(`/c/${parsed.slug}/admin`)}`);
+        return;
+      }
       await mountAdmin(app!, parsed.slug);
       return;
     }
@@ -552,7 +885,12 @@ async function boot() {
   }
 
   // Unknown path → landing
-  mountLanding();
+  const [user, status] = await Promise.all([fetchMe(), fetchAuthStatus()]);
+  if (user?.needsProfileSetup) {
+    location.replace("/me/setup?next=/c/demo/admin");
+    return;
+  }
+  mountLanding(user, "", { googleEnabled: status.googleEnabled, naverEnabled: status.naverEnabled });
 }
 
 void boot();
