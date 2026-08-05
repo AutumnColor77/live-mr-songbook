@@ -48,6 +48,7 @@
 
 - [x] 신청 대기열 폴링(공개 `/queue` · admin 목록) — WebSocket은 미도입
 - [ ] 대기열 WebSocket / Durable Objects
+- [ ] 치지직 후원 세션용 Durable Object(`DonationSessionDO`) — [docs/chzzk-paid-requests.md](docs/chzzk-paid-requests.md)
 - [ ] 커스텀 도메인
 - [ ] 관측성(로그·에러 알림)·헬스 대시보드
 
@@ -55,5 +56,18 @@
 
 - [x] D1 마이그레이션·`npm run deploy` 파이프라인
 - [x] README를 현재 기능에 맞게 정리
+- [x] 치지직 도네·유료 신청 설계 메모 ([docs/chzzk-paid-requests.md](docs/chzzk-paid-requests.md))
 - [ ] API/E2E 테스트 최소 세트
 - [ ] README·API 표를 코드와 주기적으로 맞추기
+
+## 7. 치지직 도네·유료 신청곡
+
+설계: [docs/chzzk-paid-requests.md](docs/chzzk-paid-requests.md)  
+방향: 공식 Session `DONATION` + 신청 코드 매칭. 결제 대행은 하지 않음.
+
+- [ ] `request_checkouts`·가격/`request_mode` 설정·`requests.pay_amount` 등 스키마
+- [ ] checkout API + 시청자 유료 신청 모달 + 운영 가격·모드 설정
+- [ ] (검증용) 호스트 수동 결제 확인으로 플로우 먼저 검증
+- [ ] 치지직 OAuth 연결(후원 조회 Scope) + 토큰 보관
+- [ ] DonationSessionDO 후원 구독·코드/금액 매칭·멱등 처리
+- [ ] 유료 전용 모드·금액 우선순위 등 고도화

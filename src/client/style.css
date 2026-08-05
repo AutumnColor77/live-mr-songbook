@@ -687,6 +687,21 @@ button,
   color: var(--text-dim, var(--text-muted));
 }
 
+.donation-badge {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: rgb(var(--accent-rgb));
+  background: rgb(var(--accent-rgb) / 0.12);
+  border: 1px solid rgb(var(--accent-rgb) / 0.28);
+  white-space: nowrap;
+}
+
 /* Mobile: thumb + info + action */
 @media (max-width: 768px) {
   .song-card.list-row {

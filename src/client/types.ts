@@ -8,6 +8,7 @@ export type Song = {
   songKey: string | null;
   bpm: number | null;
   difficulty?: number | null;
+  donationAmount?: number | null;
   thumbnail?: string;
 };
 

@@ -5,6 +5,7 @@ import { newId } from "../id";
 import {
   mapRequest,
   mapSong,
+  normalizeDonationAmount,
   normalizeThumbnail,
   type AppEnv,
   type RequestRow,
@@ -58,6 +59,7 @@ admin.post("/songs", async (c) => {
     songKey?: string | null;
     bpm?: number | null;
     difficulty?: number | null;
+    donationAmount?: number | null;
     thumbnail?: string | null;
     enabled?: boolean;
   };
@@ -76,14 +78,15 @@ admin.post("/songs", async (c) => {
   const category = normalizeCategory(body.category);
   const genre = normalizeGenre(body.genre);
   const difficulty = normalizeDifficulty(body.difficulty);
+  const donationAmount = normalizeDonationAmount(body.donationAmount);
   const tags = Array.isArray(body.tags) ? body.tags.map(String) : [];
   const thumbnail = normalizeThumbnail(body.thumbnail);
   const now = Date.now();
   const id = newId("song");
 
   await c.env.DB.prepare(
-    `INSERT INTO songs (id, channel_id, title, artist, category, genre, tags, song_key, bpm, difficulty, thumbnail, enabled, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO songs (id, channel_id, title, artist, category, genre, tags, song_key, bpm, difficulty, donation_amount, thumbnail, enabled, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   )
     .bind(
       id,
@@ -96,6 +99,7 @@ admin.post("/songs", async (c) => {
       body.songKey ?? null,
       body.bpm ?? null,
       difficulty,
+      donationAmount,
       thumbnail,
       body.enabled === false ? 0 : 1,
       now,
@@ -128,6 +132,7 @@ admin.patch("/songs/:id", async (c) => {
     songKey: string | null;
     bpm: number | null;
     difficulty: number | null;
+    donationAmount: number | null;
     thumbnail: string | null;
     enabled: boolean;
   }>;
@@ -155,6 +160,10 @@ admin.patch("/songs/:id", async (c) => {
     body.difficulty !== undefined
       ? normalizeDifficulty(body.difficulty)
       : (existing.difficulty ?? null);
+  const donationAmount =
+    body.donationAmount !== undefined
+      ? normalizeDonationAmount(body.donationAmount)
+      : (existing.donation_amount ?? null);
   const thumbnail =
     body.thumbnail !== undefined
       ? normalizeThumbnail(body.thumbnail)
@@ -164,7 +173,7 @@ admin.patch("/songs/:id", async (c) => {
   const updatedAt = Date.now();
 
   await c.env.DB.prepare(
-    `UPDATE songs SET title = ?, artist = ?, category = ?, genre = ?, tags = ?, song_key = ?, bpm = ?, difficulty = ?, thumbnail = ?, enabled = ?, updated_at = ?
+    `UPDATE songs SET title = ?, artist = ?, category = ?, genre = ?, tags = ?, song_key = ?, bpm = ?, difficulty = ?, donation_amount = ?, thumbnail = ?, enabled = ?, updated_at = ?
      WHERE id = ? AND channel_id = ?`,
   )
     .bind(
@@ -176,6 +185,7 @@ admin.patch("/songs/:id", async (c) => {
       songKey,
       bpm,
       difficulty,
+      donationAmount,
       thumbnail,
       enabled,
       updatedAt,

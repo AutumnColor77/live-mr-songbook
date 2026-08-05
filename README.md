@@ -4,7 +4,7 @@
 
 Live MR Manager와는 **별도 리포**입니다. 스트리머는 소셜 로그인으로 본인 채널을 만들고, Manager 앱에서 라이브러리를 **Push** 동기화합니다. 시청자는 비로그인으로 `/c/:slug`에서 곡을 검색·신청합니다.
 
-로드맵·미완 작업은 [`TODO.md`](TODO.md)를 보세요.
+로드맵·미완 작업은 [`TODO.md`](TODO.md)를 보세요. 치지직 도네·유료 신청 설계는 [`docs/chzzk-paid-requests.md`](docs/chzzk-paid-requests.md).
 
 ## Production
 
@@ -146,7 +146,7 @@ npx wrangler secret put NAVER_CLIENT_SECRET
 Manager 앱에서 Songbook에 로그인한 뒤 라이브러리를 채널로 **Push**합니다.
 
 - 본인 채널만 대상(demo 차단). 없으면 `/api/me/channels`로 생성 유도
-- 곡 메타: 제목·아티스트·장르·카테고리·태그·키·BPM·난이도·썸네일
+- 곡 메타: 제목·아티스트·장르·카테고리·태그·키·BPM·난이도·후원금액·썸네일
 - 썸네일: `http(s)` URL 유지, 로컬 이미지는 JPEG data URL로 압축 업로드
 - 기존 곡은 title+artist 키로 PATCH
 - 로컬에 없는 원격 곡은 Push 시 `enabled=false`(공개 목록 숨김)

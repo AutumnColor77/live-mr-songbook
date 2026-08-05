@@ -65,6 +65,7 @@ export type SongRow = {
   song_key: string | null;
   bpm: number | null;
   difficulty: number | null;
+  donation_amount: number | null;
   thumbnail: string;
   enabled: number;
   created_at: number;
@@ -94,6 +95,7 @@ export type Song = {
   songKey: string | null;
   bpm: number | null;
   difficulty: number | null;
+  donationAmount: number | null;
   thumbnail: string;
   enabled: boolean;
   createdAt: number;
@@ -138,6 +140,16 @@ export type SongRequest = {
   sortOrder: number;
 };
 
+/** Suggested tip amount in KRW (0 clears / null keeps unset). Cap 100_000_000. */
+export function normalizeDonationAmount(raw: unknown): number | null {
+  if (raw == null || raw === "") return null;
+  const n = typeof raw === "number" ? raw : Number(raw);
+  if (!Number.isFinite(n)) return null;
+  const rounded = Math.round(n);
+  if (rounded < 0 || rounded > 100_000_000) return null;
+  return rounded;
+}
+
 export function mapSong(row: SongRow): Song {
   let tags: string[] = [];
   try {
@@ -146,6 +158,12 @@ export function mapSong(row: SongRow): Song {
   } catch {
     tags = [];
   }
+  const donation =
+    typeof row.donation_amount === "number" &&
+    Number.isFinite(row.donation_amount) &&
+    row.donation_amount >= 0
+      ? Math.round(row.donation_amount)
+      : null;
   return {
     id: row.id,
     title: row.title,
@@ -159,6 +177,7 @@ export function mapSong(row: SongRow): Song {
       typeof row.difficulty === "number" && row.difficulty >= 1 && row.difficulty <= 5
         ? row.difficulty
         : null,
+    donationAmount: donation,
     thumbnail: row.thumbnail ?? "",
     enabled: row.enabled === 1,
     createdAt: row.created_at,

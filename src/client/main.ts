@@ -935,6 +935,12 @@ async function mountSongbook(slug: string) {
     return `<span class="diff-stars${n ? "" : " is-empty"}" title="${title}" aria-label="${title}">${stars}</span>`;
   }
 
+  function donationBadgeHtml(amount: number | null | undefined): string {
+    if (typeof amount !== "number" || !Number.isFinite(amount) || amount <= 0) return "";
+    const won = Math.round(amount).toLocaleString("ko-KR");
+    return `<span class="donation-badge" title="후원금액 ${won}원">₩${won}</span>`;
+  }
+
   function renderSongs() {
     const list = $("#song-list");
     $("#song-count").textContent = String(state.songs.length);
@@ -986,12 +992,15 @@ async function mountSongbook(slug: string) {
             ? `<span class="genre-badge">${escapeHtml(genreLabel)}</span>`
             : "";
         const diffStars = difficultyStarsHtml(song.difficulty);
+        const donationBadge = donationBadgeHtml(song.donationAmount);
         const tagHtml = otherTags
           .map((t) => `<span class="tag-badge">${escapeHtml(t)}</span>`)
           .join("");
         const hasGenreCol = Boolean(mrBadge || categoryBadge || genreBadge);
         const hasTagsCol = otherTags.length > 0;
-        const mobileMeta = [mrBadge, categoryBadge, genreBadge].filter(Boolean).join("");
+        const mobileMeta = [mrBadge, categoryBadge, genreBadge, donationBadge]
+          .filter(Boolean)
+          .join("");
 
         if (isButton) {
           return `
@@ -1009,6 +1018,7 @@ async function mountSongbook(slug: string) {
                 <div class="song-artist">${escapeHtml(song.artist)}</div>
                 <div class="button-meta-row">
                   ${diffStars}
+                  ${donationBadge}
                   ${mrBadgeSm}
                 </div>
               </div>
@@ -1046,6 +1056,7 @@ async function mountSongbook(slug: string) {
             }
             <div class="col col-action">
               ${diffStars}
+              ${donationBadge}
               <button
                 type="button"
                 class="request-btn primary-btn btn-sm"
