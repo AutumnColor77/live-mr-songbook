@@ -915,13 +915,7 @@ async function mountSongbook(slug: string) {
   }
 
   function songGenreLabel(song: Song): string {
-    const genre = String(song.genre || "").trim();
-    if (genre) return genre;
-    return String(song.category || "").trim() || "미분류";
-  }
-
-  function songCategoryLabel(song: Song): string {
-    return String(song.category || "").trim();
+    return String(song.genre || "").trim() || "미분류";
   }
 
   function difficultyStarsHtml(level: number | null | undefined): string {
@@ -983,10 +977,6 @@ async function mountSongbook(slug: string) {
         const mrBadge = hasMr ? `<span class="status-badge mr">MR</span>` : "";
         const mrBadgeSm = hasMr ? `<span class="status-badge mr sm">MR</span>` : "";
         const genreLabel = songGenreLabel(song);
-        const categoryLabel = songCategoryLabel(song);
-        const categoryBadge = categoryLabel
-          ? `<span class="category-badge">${escapeHtml(categoryLabel)}</span>`
-          : "";
         const genreBadge =
           genreLabel && genreLabel !== "미분류"
             ? `<span class="genre-badge">${escapeHtml(genreLabel)}</span>`
@@ -996,11 +986,9 @@ async function mountSongbook(slug: string) {
         const tagHtml = otherTags
           .map((t) => `<span class="tag-badge">${escapeHtml(t)}</span>`)
           .join("");
-        const hasGenreCol = Boolean(mrBadge || categoryBadge || genreBadge);
+        const hasGenreCol = Boolean(mrBadge || genreBadge);
         const hasTagsCol = otherTags.length > 0;
-        const mobileMeta = [mrBadge, categoryBadge, genreBadge, donationBadge]
-          .filter(Boolean)
-          .join("");
+        const mobileMeta = [mrBadge, genreBadge, donationBadge].filter(Boolean).join("");
 
         if (isButton) {
           return `
@@ -1042,7 +1030,6 @@ async function mountSongbook(slug: string) {
               hasGenreCol
                 ? `<div class="col col-genre">
               ${mrBadge ? `<div class="status-badge-wrapper">${mrBadge}</div>` : ""}
-              ${categoryBadge}
               ${genreBadge}
             </div>`
                 : `<div class="col col-genre"></div>`

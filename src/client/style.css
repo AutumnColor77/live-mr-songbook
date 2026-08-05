@@ -517,13 +517,13 @@ button,
 .song-card.list-row {
   position: relative;
   display: grid;
-  grid-template-columns: 120px minmax(160px, 1.3fr) minmax(120px, 180px) minmax(0, 1.7fr) auto;
+  grid-template-columns: 120px minmax(140px, 1.2fr) auto minmax(0, 0.9fr) auto;
   align-items: center;
   width: 100%;
   height: 72px;
   min-height: 72px;
   padding: 0 12px 0 0;
-  gap: 12px;
+  gap: 10px;
   margin: 0;
   overflow: hidden;
   background: var(--glass-bg);
