@@ -95,28 +95,28 @@ function authErrorNotice(reason: string): string {
   return messages[reason] ?? "로그인에 실패했습니다. 다시 시도해 주세요.";
 }
 
-function consumeAuthQuery(): { notice: string; ok: boolean } {
+function consumeAuthQuery(): { toast: string; errorNotice: string } {
   const params = new URLSearchParams(location.search);
   const authStatus = params.get("auth");
-  let notice = "";
-  let ok = false;
+  let toast = "";
+  let errorNotice = "";
   if (authStatus === "ok") {
-    notice = "로그인되었습니다.";
-    ok = true;
+    toast = "로그인되었습니다.";
   } else if (authStatus === "error") {
-    notice = authErrorNotice(params.get("reason") ?? "unknown");
+    errorNotice = authErrorNotice(params.get("reason") ?? "unknown");
   }
   if (authStatus) {
     history.replaceState({}, "", location.pathname);
   }
-  return { notice, ok };
+  return { toast, errorNotice };
 }
 
 async function mountAccount(
   root: HTMLElement,
   user: AuthUser,
   channels: UserChannel[],
-  notice = "",
+  inlineNotice = "",
+  toast = "",
 ): Promise<void> {
   applyTheme(currentTheme());
   document.title = "내 채널 · Live MR Songbook";
@@ -191,8 +191,8 @@ async function mountAccount(
               </div>
             </div>
             ${
-              notice
-                ? `<p class="text-sm font-semibold" style="color:${notice.startsWith("로그인") || notice.startsWith("저장") || notice.startsWith("채널") || notice.startsWith("노래책") ? "#4ade80" : "#f87171"}">${escapeHtml(notice)}</p>`
+              inlineNotice
+                ? `<p class="text-sm font-semibold" style="color:${inlineNotice.startsWith("저장") || inlineNotice.startsWith("채널") || inlineNotice.startsWith("노래책") ? "#4ade80" : "#f87171"}">${escapeHtml(inlineNotice)}</p>`
                 : ""
             }
           </div>
@@ -363,15 +363,19 @@ async function mountAccount(
       );
     },
   });
+
+  if (toast) {
+    showAccountToast(toast);
+  }
 }
 
 function mountLanding(
   user: AuthUser | null = null,
-  notice = "",
   providers: { googleEnabled: boolean; naverEnabled: boolean } = {
     googleEnabled: false,
     naverEnabled: false,
   },
+  feedback: { toast?: string; errorNotice?: string } = {},
 ) {
   applyTheme(currentTheme());
 
@@ -420,8 +424,8 @@ function mountLanding(
             </p>
           </div>
           ${
-            notice
-              ? `<p class="text-sm font-semibold" style="color:${notice.startsWith("로그인") || notice.startsWith("로그아웃") ? "#4ade80" : "#f87171"}">${escapeHtml(notice)}</p>`
+            feedback.errorNotice
+              ? `<p class="text-sm font-semibold" style="color:#f87171">${escapeHtml(feedback.errorNotice)}</p>`
               : ""
           }
           ${authBlock}
@@ -441,11 +445,15 @@ function mountLanding(
   if (logoutBtn) {
     logoutBtn.addEventListener("click", async () => {
       await logout();
-      mountLanding(null, "로그아웃되었습니다.", providers);
+      mountLanding(null, providers, { toast: "로그아웃되었습니다." });
     });
   }
 
   bindLoginPicker({ next: "/me", onToast: showToast });
+
+  if (feedback.toast) {
+    showToast(feedback.toast);
+  }
 }
 
 async function mountProfileSetup(root: HTMLElement, user: AuthUser): Promise<void> {
@@ -1307,7 +1315,7 @@ async function boot() {
   }
 
   if (location.pathname === "/me" || location.pathname === "/me/") {
-    const { notice } = consumeAuthQuery();
+    const { toast, errorNotice } = consumeAuthQuery();
     const session = await fetchSession();
     if (!session) {
       location.replace("/?auth=error&reason=access_denied");
@@ -1317,12 +1325,12 @@ async function boot() {
       location.replace("/me/setup?next=/me");
       return;
     }
-    await mountAccount(app!, session.user, session.channels, notice);
+    await mountAccount(app!, session.user, session.channels, errorNotice, toast);
     return;
   }
 
   if (location.pathname === "/" || location.pathname === "") {
-    const { notice } = consumeAuthQuery();
+    const { toast, errorNotice } = consumeAuthQuery();
     const params = new URLSearchParams(location.search);
     const isDesktop = params.get("client") === "desktop";
     const [user, status] = await Promise.all([fetchMe(), fetchAuthStatus()]);
@@ -1341,7 +1349,7 @@ async function boot() {
         console.warn("[boot] desktop handoff failed", err);
       }
     }
-    mountLanding(user, notice, { googleEnabled: status.googleEnabled, naverEnabled: status.naverEnabled });
+    mountLanding(user, { googleEnabled: status.googleEnabled, naverEnabled: status.naverEnabled }, { toast, errorNotice });
     return;
   }
 
@@ -1370,7 +1378,7 @@ async function boot() {
     location.replace("/me/setup?next=/me");
     return;
   }
-  mountLanding(user, "", { googleEnabled: status.googleEnabled, naverEnabled: status.naverEnabled });
+  mountLanding(user, { googleEnabled: status.googleEnabled, naverEnabled: status.naverEnabled });
 }
 
 void boot();

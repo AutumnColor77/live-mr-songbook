@@ -65,26 +65,26 @@ function nowPlayingLabel(status: StatusResponse | null): string {
   return np ? `${np.title} - ${np.artist}` : "재생 중인 곡이 없습니다.";
 }
 
-function consumeAuthOk(): string {
+function consumeAuthRedirect(): { toast: string; errorNotice: string } {
   const params = new URLSearchParams(location.search);
   const auth = params.get("auth");
-  if (!auth) return "";
+  if (!auth) return { toast: "", errorNotice: "" };
   history.replaceState({}, "", location.pathname);
-  if (auth === "ok") return "로그인되었습니다.";
+  if (auth === "ok") return { toast: "로그인되었습니다.", errorNotice: "" };
   if (auth === "error") {
-    return "로그인에 실패했습니다. 다시 시도해 주세요.";
+    return { toast: "", errorNotice: "로그인에 실패했습니다. 다시 시도해 주세요." };
   }
-  return "";
+  return { toast: "", errorNotice: "" };
 }
 
 export async function mountAdmin(root: HTMLElement, slug: string): Promise<void> {
   applyTheme(currentTheme());
   document.title = `운영 · Live MR Songbook`;
 
-  const notice = consumeAuthOk();
+  const { toast, errorNotice } = consumeAuthRedirect();
   const [user, status] = await Promise.all([fetchMe(), fetchAuthStatus()]);
   if (!user) {
-    mountLogin(root, slug, notice.startsWith("로그인 실패") ? notice : "", null, status);
+    mountLogin(root, slug, errorNotice, null, status);
     return;
   }
 
@@ -101,7 +101,7 @@ export async function mountAdmin(root: HTMLElement, slug: string): Promise<void>
     return;
   }
 
-  await mountDashboard(root, slug, user, notice.startsWith("로그인되었습니다") ? notice : "");
+  await mountDashboard(root, slug, user, "", toast);
 }
 
 function mountLogin(
@@ -175,7 +175,8 @@ async function mountDashboard(
   root: HTMLElement,
   slug: string,
   user: AuthUser,
-  notice = "",
+  inlineNotice = "",
+  toast = "",
 ): Promise<void> {
   stopAdminPolling();
   root.innerHTML = `
@@ -207,8 +208,8 @@ async function mountDashboard(
 
       <main class="flex-1 w-full max-w-3xl mx-auto px-4 sm:px-6 py-5 space-y-4 pb-10">
         ${
-          notice
-            ? `<p class="text-sm font-semibold text-center" style="color:#4ade80">${escapeHtml(notice)}</p>`
+          inlineNotice
+            ? `<p class="text-sm font-semibold text-center" style="color:#4ade80">${escapeHtml(inlineNotice)}</p>`
             : ""
         }
         <section class="panel p-4 flex flex-wrap items-center justify-between gap-3">
@@ -430,4 +431,8 @@ async function mountDashboard(
 
   await refresh();
   adminPollTimer = window.setInterval(() => void refresh(), 4000);
+
+  if (toast) {
+    showToast(toast);
+  }
 }
