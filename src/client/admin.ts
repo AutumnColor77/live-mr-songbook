@@ -608,9 +608,9 @@ async function mountDashboard(
     if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) return;
 
     if (fromIndex < toIndex) {
-      target.after(fromEl);
+      target.insertAdjacentElement("afterend", fromEl);
     } else {
-      target.before(fromEl);
+      target.insertAdjacentElement("beforebegin", fromEl);
     }
 
     queueList.querySelectorAll(".admin-queue-row .queue-index").forEach((el, i) => {
