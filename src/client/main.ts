@@ -134,9 +134,8 @@ async function mountAccount(
   const channelCardHtml = own
     ? `
         <div class="rounded-xl border border-glass-border bg-[var(--surface-2)] px-3 py-3 space-y-3">
-          <div class="text-center space-y-1">
+          <div class="text-center">
             <p class="text-base font-extrabold text-main">${escapeHtml(own.name)}</p>
-            <p class="text-xs text-dim truncate" id="channel-public-url" title="${escapeHtml(publicUrl)}">${escapeHtml(publicUrl)}</p>
           </div>
           <div class="flex gap-2">
             <a href="/c/${escapeHtml(own.slug)}/admin" class="primary-btn btn-sm flex-1 text-center">운영하기</a>
