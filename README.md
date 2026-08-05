@@ -121,6 +121,7 @@ npx wrangler secret put NAVER_CLIENT_SECRET
 | `PATCH` | `/api/c/:slug/admin/requests/:id` body `{ status }` |
 | `PATCH` | `/api/c/:slug/admin/settings` body `{ acceptingRequests?, duplicatePolicy?: 'allow'\|'queue'\|'played', nowPlayingId? }` |
 | `POST` | `/api/c/:slug/admin/queue/clear` (대기열 reject + 부른 곡 중복 세션 초기화) |
+| `POST` | `/api/c/:slug/admin/queue/reorder` body `{ ids: string[] }` (`pending`/`playing` id 집합과 일치, `sort_order` 갱신) |
 
 ### Platform (`Authorization: Bearer <PLATFORM_ADMIN_TOKEN>`)
 
@@ -137,7 +138,7 @@ npx wrangler secret put NAVER_CLIENT_SECRET
 - `/me/setup` — 최초 프로필(닉네임·아바타)
 - `/me` — 채널 생성/수정(표시 이름·슬러그), 프로필 편집
 - `/c/:slug` — 시청자: 검색, 접이식 **장르·가수** 필터, 리스트/버튼 모드, 썸네일·난이도, 신청·대기열·Now Playing
-- `/c/:slug/admin` — 운영: 신청 on/off, 중복 정책(허용/대기열만/부른 곡 포함), 대기열 재생/완료/거절·비우기(세션 초기화)
+- `/c/:slug/admin` — 운영: 신청 on/off, 중복 정책(허용/대기열만/부른 곡 포함), 대기열 재생/완료/거절·드래그 순서·비우기(세션 초기화)
 - 테마: 다크 / 라이트 / 핑크 / 스카이
 
 ## Live MR Manager 연동
@@ -148,8 +149,10 @@ Manager 앱에서 Songbook에 로그인한 뒤 라이브러리를 채널로 **Pu
 - 곡 메타: 제목·아티스트·장르·카테고리·태그·키·BPM·난이도·썸네일
 - 썸네일: `http(s)` URL 유지, 로컬 이미지는 JPEG data URL로 압축 업로드
 - 기존 곡은 title+artist 키로 PATCH
+- 로컬에 없는 원격 곡은 Push 시 `enabled=false`(공개 목록 숨김)
+- 신청 대기열 순서는 `sort_order` — Manager 신청목록·웹 admin 드래그 → `POST .../queue/reorder`
 
-구현 위치(Manager 리포): `src/js/songbook-sync.js`, `songbook-thumbnail.js`, 데스크톱 OAuth/세션 스토어.
+구현 위치(Manager 리포): `src/js/songbook-sync.js`, `songbook-requests.js`, `songbook-thumbnail.js`, 데스크톱 OAuth/세션 스토어.
 
 ## Design
 

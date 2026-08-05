@@ -28,6 +28,7 @@
 - [x] DB 기반 장르·가수 필터(접이식)
 - [x] 썸네일·난이도(★) 표시
 - [x] 테마(다크/라이트/핑크/스카이)
+- [x] 운영 admin 대기열 드래그 순서(`sort_order`)
 - [ ] 웹 관리자용 곡 CRUD UI(현재는 API + Manager Push)
 - [ ] 정렬 옵션(제목 외 최신·난이도 등)
 
@@ -36,13 +37,16 @@
 - [x] Push 동기화(신규 POST / 기존 PATCH)
 - [x] 장르·카테고리·태그·키·BPM·난이도 전송
 - [x] 썸네일 http(s) + 로컬→JPEG data URL
+- [x] Push 시 로컬에 없는 곡 `enabled=false`(웹 숨김)
+- [x] 대기열 `sort_order` + `POST /admin/queue/reorder` (앱·웹 운영 드래그 동기화)
 - [ ] Pull(Songbook → Manager 라이브러리)
-- [ ] 원격에만 있는 곡 삭제/정합 정책
+- [ ] 원격 hard-delete·ID 기반 양방향 정합
 - [ ] 썸네일 R2(또는 동등 오브젝트 스토리지)로 data URL 부담 완화
 - [ ] Companion 링크·프로모 UX 고도화
 
 ## 5. 실시간·인프라
 
+- [x] 신청 대기열 폴링(공개 `/queue` · admin 목록) — WebSocket은 미도입
 - [ ] 대기열 WebSocket / Durable Objects
 - [ ] 커스텀 도메인
 - [ ] 관측성(로그·에러 알림)·헬스 대시보드
