@@ -220,14 +220,6 @@ async function mountDashboard(
           <button id="accepting-toggle" type="button" class="primary-btn btn-sm">신청 마감하기</button>
         </section>
 
-        <section class="panel p-4 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p class="text-xs font-extrabold text-dim tracking-wide mb-1">중복 신청</p>
-            <p id="dup-label" class="text-sm font-bold text-main">…</p>
-          </div>
-          <button id="dup-toggle" type="button" class="secondary-btn btn-sm">중복 신청 차단</button>
-        </section>
-
         <section class="panel p-5">
           <div class="flex items-center gap-3">
             <span class="dock-art">${icons.disc(22)}</span>
@@ -244,7 +236,10 @@ async function mountDashboard(
               <h2 class="text-sm font-extrabold text-main">대기열</h2>
               <span id="admin-queue-count" class="count-badge">0</span>
             </div>
-            <button id="queue-clear" type="button" class="secondary-btn btn-sm">대기열 비우기</button>
+            <div class="flex items-center gap-2 flex-wrap justify-end">
+              <button id="dup-toggle" type="button" class="secondary-btn btn-sm">중복 신청 차단</button>
+              <button id="queue-clear" type="button" class="secondary-btn btn-sm">대기열 비우기</button>
+            </div>
           </div>
           <div id="admin-queue-list" class="space-y-2"></div>
         </section>
@@ -298,7 +293,6 @@ async function mountDashboard(
     toggle.classList.toggle("secondary-btn", !accepting);
 
     const allowDup = status?.allowDuplicateRequests !== false;
-    $("#dup-label").textContent = allowDup ? "중복 신청 허용" : "중복 신청 차단";
     const dupToggle = $("#dup-toggle") as HTMLButtonElement;
     dupToggle.textContent = allowDup ? "중복 신청 차단" : "중복 신청 허용";
     dupToggle.classList.toggle("primary-btn", !allowDup);
