@@ -45,7 +45,7 @@ function applyTheme(theme: Theme) {
 
 function nowPlayingLabel(status: StatusResponse | null): string {
   const np = status?.nowPlaying;
-  return np ? `${np.title} - ${np.artist}` : "현재 재생 중인 곡이 없습니다.";
+  return np ? `${np.title} - ${np.artist}` : "재생 중인 곡이 없습니다.";
 }
 
 function consumeAuthOk(): string {
@@ -55,15 +55,14 @@ function consumeAuthOk(): string {
   history.replaceState({}, "", location.pathname);
   if (auth === "ok") return "로그인되었습니다.";
   if (auth === "error") {
-    const reason = params.get("reason") ?? "unknown";
-    return `로그인 실패: ${reason}`;
+    return "로그인에 실패했습니다. 다시 시도해 주세요.";
   }
   return "";
 }
 
 export async function mountAdmin(root: HTMLElement, slug: string): Promise<void> {
   applyTheme(currentTheme());
-  document.title = `운영 · ${slug} · Live MR Songbook`;
+  document.title = `운영 · Live MR Songbook`;
 
   const notice = consumeAuthOk();
   const [user, status] = await Promise.all([fetchMe(), fetchAuthStatus()]);
@@ -103,15 +102,14 @@ function mountLogin(
       <header class="topbar sticky top-0 z-30">
         <div class="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
           <img id="logo-lockup" class="logo-lockup" src="${logoSrc(currentTheme())}" width="480" height="120" alt="Live MR SongBook" />
-          <a href="/c/${escapeHtml(slug)}" class="secondary-btn btn-sm">시청자 페이지</a>
+          <a href="/c/${escapeHtml(slug)}" class="secondary-btn btn-sm">노래책 보기</a>
         </div>
       </header>
       <main class="flex-1 flex items-center justify-center px-4 py-12">
         <div class="panel max-w-md w-full p-8 space-y-5 text-center">
           <div class="space-y-1">
-            <p class="modal-eyebrow">Streamer Admin</p>
-            <h1 class="text-xl font-extrabold text-main">채널 운영 로그인</h1>
-            <p class="text-sm text-muted">/c/${escapeHtml(slug)}</p>
+            <h1 class="text-xl font-extrabold text-main">채널 운영</h1>
+            <p class="text-sm text-muted">이 채널을 운영하려면 로그인해 주세요.</p>
           </div>
           ${
             errorMsg
@@ -124,9 +122,9 @@ function mountLogin(
                  <button id="admin-logout" type="button" class="secondary-btn w-full">다른 계정으로</button>`
               : ""
           }
-          ${loginButtonHtml(providers)}
+          ${loginButtonHtml(providers, "로그인")}
           <p class="text-xs text-dim leading-relaxed">
-            로그인하면 이 채널 운영 화면으로 이동합니다.
+            로그인하면 대기열을 관리할 수 있습니다.
           </p>
         </div>
       </main>
@@ -167,9 +165,9 @@ async function mountDashboard(
         <div class="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
           <div class="flex items-center gap-3 min-w-0">
             <img id="logo-lockup" class="logo-lockup" src="${logoSrc(currentTheme())}" width="480" height="120" alt="Live MR SongBook" />
-            <div class="min-w-0 hidden sm:block">
+            <div class="min-w-0">
               <p id="admin-channel-name" class="text-sm font-extrabold text-main truncate">…</p>
-              <p class="text-xs font-medium text-dim">운영 · /c/${escapeHtml(slug)}</p>
+              <p class="text-xs font-medium text-dim">운영</p>
             </div>
           </div>
           <div class="flex items-center gap-2 shrink-0">
@@ -199,15 +197,15 @@ async function mountDashboard(
             <p class="text-xs font-extrabold text-dim tracking-wide mb-1">신청 접수</p>
             <p id="accepting-label" class="text-sm font-bold text-main">…</p>
           </div>
-          <button id="accepting-toggle" type="button" class="primary-btn btn-sm">전환</button>
+          <button id="accepting-toggle" type="button" class="primary-btn btn-sm">신청 마감하기</button>
         </section>
 
         <section class="panel p-5">
           <div class="flex items-center gap-3">
             <span class="dock-art">${icons.disc(22)}</span>
             <div class="min-w-0 flex-1">
-              <p class="dock-label">Now Playing</p>
-              <p id="admin-now-playing" class="song-name text-sm">현재 재생 중인 곡이 없습니다.</p>
+              <p class="dock-label">지금 재생</p>
+              <p id="admin-now-playing" class="song-name text-sm">재생 중인 곡이 없습니다.</p>
             </div>
           </div>
         </section>
@@ -242,11 +240,35 @@ async function mountDashboard(
     }, 2400);
   }
 
+  function queueActionsHtml(item: SongRequest): string {
+    const id = escapeHtml(item.id);
+    if (item.status === "playing") {
+      return `
+        <div class="admin-queue-actions">
+          <button type="button" class="admin-act primary-btn btn-sm" data-act="done" data-id="${id}">완료</button>
+          <button type="button" class="admin-act secondary-btn btn-sm" data-act="rejected" data-id="${id}">거절</button>
+        </div>`;
+    }
+    return `
+      <div class="admin-queue-actions">
+        <button type="button" class="admin-act primary-btn btn-sm" data-act="playing" data-id="${id}">재생</button>
+        <button type="button" class="admin-act secondary-btn btn-sm" data-act="done" data-id="${id}">완료</button>
+        <button type="button" class="admin-act secondary-btn btn-sm" data-act="rejected" data-id="${id}">거절</button>
+      </div>`;
+  }
+
   function render() {
-    $("#admin-channel-name").textContent = status?.channel?.name ?? slug;
-    $("#accepting-label").textContent = status?.acceptingRequests
-      ? "신청 받는 중"
-      : "신청 마감";
+    const channelName = status?.channel?.name ?? slug;
+    $("#admin-channel-name").textContent = channelName;
+    document.title = `${channelName} · 운영 · Live MR Songbook`;
+
+    const accepting = Boolean(status?.acceptingRequests);
+    $("#accepting-label").textContent = accepting ? "신청 받는 중" : "신청 마감";
+    const toggle = $("#accepting-toggle") as HTMLButtonElement;
+    toggle.textContent = accepting ? "신청 마감하기" : "신청 다시 열기";
+    toggle.classList.toggle("primary-btn", accepting);
+    toggle.classList.toggle("secondary-btn", !accepting);
+
     $("#admin-now-playing").textContent = nowPlayingLabel(status);
 
     const active = requests
@@ -274,7 +296,6 @@ async function mountDashboard(
         const comment = item.comment
           ? `<p class="text-[11px] font-medium text-dim mt-0.5">${escapeHtml(item.comment)}</p>`
           : "";
-        const playDisabled = item.status === "playing" ? "disabled" : "";
         return `
           <div class="queue-row !items-center" data-id="${escapeHtml(item.id)}">
             <span class="queue-index">${index + 1}</span>
@@ -286,11 +307,7 @@ async function mountDashboard(
               <p class="song-artist text-xs">${escapeHtml(item.artist)} · ${escapeHtml(item.nickname)}</p>
               ${comment}
             </div>
-            <div class="flex flex-col sm:flex-row gap-1.5 shrink-0">
-              <button type="button" class="admin-act primary-btn btn-sm" data-act="playing" data-id="${escapeHtml(item.id)}" ${playDisabled}>재생</button>
-              <button type="button" class="admin-act secondary-btn btn-sm" data-act="done" data-id="${escapeHtml(item.id)}">완료</button>
-              <button type="button" class="admin-act secondary-btn btn-sm" data-act="rejected" data-id="${escapeHtml(item.id)}">거절</button>
-            </div>
+            ${queueActionsHtml(item)}
           </div>`;
       })
       .join("");

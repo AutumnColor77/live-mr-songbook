@@ -74,17 +74,16 @@ function parseChannelPath(): { slug: string; admin: boolean } | null {
 
 function authErrorNotice(reason: string): string {
   const messages: Record<string, string> = {
-    not_configured: "소셜 로그인(OAuth) 설정이 필요합니다.",
+    not_configured: "지금은 로그인을 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.",
     invalid_state: "로그인 세션이 만료되었습니다. 다시 시도해 주세요.",
-    missing_code: "인증 코드가 없습니다. 다시 시도해 주세요.",
-    token_exchange:
-      "토큰 교환에 실패했습니다. Client Secret·콜백 URI를 확인하세요.",
-    userinfo: "프로필을 가져오지 못했습니다.",
-    access_denied: "로그인이 취소되었거나 앱 접근이 거부되었습니다.",
-    redirect_uri_mismatch: "콜백 URI가 개발자 콘솔 설정과 다릅니다.",
-    server: "서버 오류로 로그인에 실패했습니다.",
+    missing_code: "로그인 정보가 없습니다. 다시 시도해 주세요.",
+    token_exchange: "로그인에 실패했습니다. 다시 시도해 주세요.",
+    userinfo: "프로필을 가져오지 못했습니다. 다시 시도해 주세요.",
+    access_denied: "로그인이 취소되었거나 접근이 거부되었습니다.",
+    redirect_uri_mismatch: "로그인 설정에 문제가 있습니다. 관리자에게 문의해 주세요.",
+    server: "서버 오류로 로그인에 실패했습니다. 잠시 후 다시 시도해 주세요.",
   };
-  return messages[reason] ?? `로그인에 실패했습니다. (${reason})`;
+  return messages[reason] ?? "로그인에 실패했습니다. 다시 시도해 주세요.";
 }
 
 function consumeAuthQuery(): { notice: string; ok: boolean } {
@@ -111,7 +110,7 @@ async function mountAccount(
   notice = "",
 ): Promise<void> {
   applyTheme(currentTheme());
-  document.title = "내 계정 · Live MR Songbook";
+  document.title = "내 채널 · Live MR Songbook";
 
   const nextPath = (() => {
     const raw = new URLSearchParams(location.search).get("next") || "";
@@ -121,28 +120,38 @@ async function mountAccount(
 
   const ownChannels = channels.filter((ch) => ch.slug !== "demo");
   const own = ownChannels[0] ?? null;
-  const channelListHtml = own
+  const publicUrl = own ? `${location.origin}/c/${own.slug}` : "";
+
+  const channelCardHtml = own
     ? `
         <div class="rounded-xl border border-glass-border bg-[var(--surface-2)] px-3 py-3 space-y-3">
-          <form id="edit-channel-form" class="space-y-3" data-channel-id="${escapeHtml(own.id)}">
-            <label class="block text-left space-y-1.5">
-              <span class="text-xs font-extrabold text-dim tracking-wide">표시 이름</span>
-              <input id="edit-channel-name" type="text" maxlength="80" required class="w-full rounded-xl border border-glass-border bg-[var(--surface-3)] px-3 py-2.5 text-sm text-main" value="${escapeHtml(own.name)}" />
-            </label>
-            <label class="block text-left space-y-1.5">
-              <span class="text-xs font-extrabold text-dim tracking-wide">주소 (슬러그)</span>
-              <span class="flex items-center gap-1.5">
-                <span class="text-xs text-dim shrink-0">/c/</span>
-                <input id="edit-channel-slug" type="text" maxlength="63" required pattern="[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?" class="w-full rounded-xl border border-glass-border bg-[var(--surface-3)] px-3 py-2.5 text-sm text-main" value="${escapeHtml(own.slug)}" />
-              </span>
-            </label>
-            <p id="edit-channel-error" class="text-sm font-semibold text-center" style="color:#f87171" hidden></p>
-            <button type="submit" class="primary-btn w-full btn-sm">채널 저장</button>
-          </form>
-          <div class="flex gap-2">
-            <a href="/c/${escapeHtml(own.slug)}/admin" class="secondary-btn btn-sm flex-1 text-center">운영</a>
-            <a href="/c/${escapeHtml(own.slug)}" class="secondary-btn btn-sm flex-1 text-center" target="_blank" rel="noopener">공개 페이지</a>
+          <div class="text-center space-y-1">
+            <p class="text-base font-extrabold text-main">${escapeHtml(own.name)}</p>
+            <p class="text-xs text-dim truncate" id="channel-public-url" title="${escapeHtml(publicUrl)}">${escapeHtml(publicUrl)}</p>
           </div>
+          <div class="flex gap-2">
+            <a href="/c/${escapeHtml(own.slug)}/admin" class="primary-btn btn-sm flex-1 text-center">운영하기</a>
+            <a href="/c/${escapeHtml(own.slug)}" class="secondary-btn btn-sm flex-1 text-center" target="_blank" rel="noopener">노래책 열기</a>
+          </div>
+          <button type="button" id="copy-channel-url" class="secondary-btn btn-sm w-full">공개 주소 복사</button>
+          <details class="border-t border-glass-border pt-3">
+            <summary class="cursor-pointer text-xs font-extrabold text-dim tracking-wide text-center list-none">채널 설정</summary>
+            <form id="edit-channel-form" class="mt-3 space-y-3" data-channel-id="${escapeHtml(own.id)}">
+              <label class="block text-left space-y-1.5">
+                <span class="text-xs font-extrabold text-dim tracking-wide">표시 이름</span>
+                <input id="edit-channel-name" type="text" maxlength="80" required class="w-full rounded-xl border border-glass-border bg-[var(--surface-3)] px-3 py-2.5 text-sm text-main" value="${escapeHtml(own.name)}" />
+              </label>
+              <label class="block text-left space-y-1.5">
+                <span class="text-xs font-extrabold text-dim tracking-wide">공개 주소</span>
+                <span class="flex items-center gap-1.5">
+                  <span class="text-xs text-dim shrink-0">/c/</span>
+                  <input id="edit-channel-slug" type="text" maxlength="63" required pattern="[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?" class="w-full rounded-xl border border-glass-border bg-[var(--surface-3)] px-3 py-2.5 text-sm text-main" value="${escapeHtml(own.slug)}" />
+                </span>
+              </label>
+              <p id="edit-channel-error" class="text-sm font-semibold text-center" style="color:#f87171" hidden></p>
+              <button type="submit" class="primary-btn w-full btn-sm">채널 저장</button>
+            </form>
+          </details>
         </div>`
     : `<p class="text-sm text-dim text-center py-2">아직 만든 채널이 없습니다.</p>`;
 
@@ -162,7 +171,6 @@ async function mountAccount(
       <main class="flex-1 flex items-center justify-center px-4 py-12">
         <div class="panel max-w-md w-full p-8 space-y-6">
           <div class="text-center space-y-3">
-            <p class="modal-eyebrow">Account</p>
             <h1 class="text-xl font-extrabold text-main">내 채널</h1>
             <div class="flex items-center gap-3 justify-center">
               ${
@@ -177,30 +185,29 @@ async function mountAccount(
             </div>
             ${
               notice
-                ? `<p class="text-sm font-semibold" style="color:${notice.startsWith("로그인") || notice.startsWith("저장") || notice.startsWith("채널") ? "#4ade80" : "#f87171"}">${escapeHtml(notice)}</p>`
+                ? `<p class="text-sm font-semibold" style="color:${notice.startsWith("로그인") || notice.startsWith("저장") || notice.startsWith("채널") || notice.startsWith("공개") ? "#4ade80" : "#f87171"}">${escapeHtml(notice)}</p>`
                 : ""
             }
           </div>
 
           <section class="space-y-2.5">
-            <p class="text-xs font-extrabold text-dim tracking-wide">내 채널</p>
-            <div class="space-y-2">${channelListHtml}</div>
+            <div class="space-y-2">${channelCardHtml}</div>
           </section>
 
           ${
             ownChannels.length === 0
               ? `
           <form id="create-channel-form" class="space-y-3 border-t border-glass-border pt-5">
-            <p class="text-xs font-extrabold text-dim tracking-wide text-center">채널 만들기</p>
+            <p class="text-sm font-extrabold text-main text-center">채널 만들기</p>
             <label class="block text-left space-y-1.5">
               <span class="text-xs font-extrabold text-dim tracking-wide">표시 이름</span>
               <input id="channel-name" type="text" maxlength="80" required class="w-full rounded-xl border border-glass-border bg-[var(--surface-2)] px-3 py-2.5 text-sm text-main" placeholder="예: 가을색의 노래책" value="${escapeHtml(user.name ? `${user.name}의 노래책` : "")}" />
             </label>
             <p id="channel-url-hint" class="text-xs text-dim text-left leading-relaxed">
-              주소는 자동으로 정해집니다. 만든 뒤 <code class="text-accent">/c/…</code> 로 확인하세요.
+              공개 주소는 자동으로 만들어집니다. 나중에 바꿀 수 있어요.
             </p>
             <details id="slug-details" class="text-left">
-              <summary class="cursor-pointer text-xs font-extrabold text-dim tracking-wide">URL 직접 지정</summary>
+              <summary class="cursor-pointer text-xs font-extrabold text-dim tracking-wide">주소 직접 지정</summary>
               <label class="mt-2 flex items-center gap-1.5">
                 <span class="text-xs text-dim shrink-0">/c/</span>
                 <input id="channel-slug" type="text" maxlength="63" pattern="[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?" class="w-full rounded-xl border border-glass-border bg-[var(--surface-2)] px-3 py-2.5 text-sm text-main" placeholder="비우면 자동 생성" />
@@ -226,7 +233,7 @@ async function mountAccount(
                 ? `<a href="${escapeHtml(nextPath)}" class="secondary-btn w-full">돌아가기</a>`
                 : ""
             }
-            <a href="/c/demo" class="secondary-btn w-full">데모 노래책 체험</a>
+            <a href="/c/demo" class="secondary-btn w-full">데모 체험</a>
             <a href="/" class="secondary-btn w-full">홈으로</a>
           </div>
         </div>
@@ -244,6 +251,28 @@ async function mountAccount(
     await logout();
     location.assign("/");
   });
+
+  const copyBtn = document.querySelector<HTMLButtonElement>("#copy-channel-url");
+  if (copyBtn && publicUrl) {
+    copyBtn.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(publicUrl);
+        showAccountToast("공개 주소를 복사했습니다.");
+      } catch {
+        showAccountToast("복사에 실패했습니다.");
+      }
+    });
+  }
+
+  function showAccountToast(message: string) {
+    const toast = document.querySelector<HTMLElement>("#toast");
+    if (!toast) return;
+    toast.textContent = message;
+    toast.hidden = false;
+    window.setTimeout(() => {
+      toast.hidden = true;
+    }, 2400);
+  }
 
   const createForm = document.querySelector<HTMLFormElement>("#create-channel-form");
   if (createForm) {
@@ -304,7 +333,7 @@ async function mountAccount(
           user,
           session?.channels ?? [{ ...updated }],
           slugChanged
-            ? `채널이 저장되었습니다. 새 주소는 /c/${updated.slug} 입니다.`
+            ? "공개 주소가 바뀌었습니다. 새 주소를 복사해 공유하세요."
             : "채널이 저장되었습니다.",
         );
       } catch (err) {
@@ -352,24 +381,13 @@ function mountLanding(
 
   const authBlock = user
     ? `
-      <a href="/me" class="flex items-center gap-3 justify-center rounded-xl border border-glass-border bg-[var(--surface-2)] px-3 py-3 hover:bg-[var(--surface-3)] transition-colors">
-        ${
-          user.picture
-            ? `<img src="${escapeHtml(user.picture)}" alt="" class="w-10 h-10 rounded-full border border-glass-border object-cover" referrerpolicy="no-referrer" />`
-            : `<span class="w-10 h-10 rounded-full bg-[var(--surface-3)] flex items-center justify-center text-sm font-extrabold text-main">${escapeHtml((user.name || user.email).slice(0, 1).toUpperCase())}</span>`
-        }
-        <div class="min-w-0 text-left flex-1">
-          <p class="text-sm font-extrabold text-main truncate">${escapeHtml(user.name || "사용자")}</p>
-          <p class="text-xs text-dim truncate">내 채널 · 프로필</p>
-        </div>
-      </a>
-      <a href="/me" class="primary-btn w-full">내 채널 관리</a>
+      <a href="/me" class="primary-btn w-full">내 채널로</a>
       <button id="logout-btn" type="button" class="secondary-btn w-full">로그아웃</button>
     `
     : `
-      ${loginButtonHtml(providers)}
+      ${loginButtonHtml(providers, "내 채널 시작")}
       <p class="text-xs text-dim text-center leading-relaxed">
-        로그인하면 내 채널을 만들고 운영할 수 있습니다.
+        로그인하면 내 노래책을 만들고 운영할 수 있습니다.
       </p>
     `;
 
@@ -396,7 +414,7 @@ function mountLanding(
           <div>
             <h1 class="text-xl font-extrabold text-main mb-2">Live MR Songbook</h1>
             <p class="text-sm font-medium text-muted">
-              스트리머별 노래책 URL로 접속해 신청하세요.
+              방송용 노래책을 만들고, 시청자가 바로 신청할 수 있어요.
             </p>
           </div>
           ${
@@ -406,12 +424,8 @@ function mountLanding(
           }
           ${authBlock}
           <div class="border-t border-glass-border pt-5 space-y-3">
-            <a href="/c/demo" class="secondary-btn w-full">데모 노래책 체험</a>
+            <a href="/c/demo" class="secondary-btn w-full">데모 체험</a>
           </div>
-          <p class="text-xs text-dim leading-relaxed">
-            시청자 <code class="text-accent">/c/채널슬러그</code><br />
-            운영 <code class="text-accent">/c/채널슬러그/admin</code>
-          </p>
         </div>
       </main>
       ${loginPickerOverlayHtml(providers)}
@@ -459,7 +473,6 @@ async function mountProfileSetup(root: HTMLElement, user: AuthUser): Promise<voi
       <main class="flex-1 flex items-center justify-center px-4 py-12">
         <form id="profile-setup-form" class="panel max-w-md w-full p-8 space-y-5 text-center">
           <div class="space-y-1">
-            <p class="modal-eyebrow">Welcome</p>
             <h1 class="text-xl font-extrabold text-main">프로필 설정</h1>
             <p class="text-sm text-muted">닉네임과 프로필 사진을 정해 주세요.</p>
           </div>
@@ -492,7 +505,7 @@ function mountInvalidSlug() {
     <div class="relative z-10 min-h-screen flex items-center justify-center px-4">
       <div class="panel max-w-md w-full p-8 text-center space-y-4">
         <h1 class="text-lg font-extrabold text-main">잘못된 채널 주소</h1>
-        <p class="text-sm text-muted">슬러그 형식을 확인해 주세요.</p>
+        <p class="text-sm text-muted">주소를 확인해 주세요.</p>
         <a href="/" class="secondary-btn w-full">홈으로</a>
       </div>
     </div>
@@ -502,6 +515,7 @@ function mountInvalidSlug() {
 type ViewMode = "list" | "button";
 const VIEW_MODE_KEY = "sb_viewMode";
 const FILTER_OPEN_KEY = "sb_filterOpen";
+const NICKNAME_KEY = "sb_nickname";
 
 function readViewMode(): ViewMode {
   try {
@@ -519,14 +533,31 @@ function readFilterOpen(): { genre: boolean; artist: boolean } {
     if (raw) {
       const parsed = JSON.parse(raw) as { genre?: boolean; artist?: boolean };
       return {
-        genre: parsed.genre !== false,
-        artist: parsed.artist !== false,
+        genre: parsed.genre === true,
+        artist: parsed.artist === true,
       };
     }
   } catch {
     /* ignore */
   }
-  return { genre: true, artist: true };
+  return { genre: false, artist: false };
+}
+
+function readStoredNickname(): string {
+  try {
+    return localStorage.getItem(NICKNAME_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function storeNickname(value: string) {
+  try {
+    if (value) localStorage.setItem(NICKNAME_KEY, value);
+    else localStorage.removeItem(NICKNAME_KEY);
+  } catch {
+    /* ignore */
+  }
 }
 
 type State = {
@@ -562,9 +593,8 @@ async function mountSongbook(slug: string) {
             alt="Live MR SongBook"
             fetchpriority="high"
           />
-          <div class="min-w-0 hidden md:block">
+          <div class="min-w-0">
             <p id="channel-name" class="text-sm font-extrabold text-main truncate">…</p>
-            <p class="text-xs font-medium text-dim">/c/${escapeHtml(slug)} · 시청자 신청</p>
           </div>
         </div>
         <div class="flex items-center gap-2 shrink-0">
@@ -598,7 +628,7 @@ async function mountSongbook(slug: string) {
 
           <div class="filter-panels">
             <section id="genre-filter-panel" class="filter-panel">
-              <button type="button" class="filter-panel-toggle" id="genre-filter-toggle" aria-expanded="true">
+              <button type="button" class="filter-panel-toggle" id="genre-filter-toggle" aria-expanded="false">
                 <span class="filter-panel-label">장르</span>
                 <span class="filter-panel-rule" aria-hidden="true"></span>
                 <span class="filter-panel-meta" id="genre-filter-meta"></span>
@@ -607,7 +637,7 @@ async function mountSongbook(slug: string) {
               <div id="genre-chips" class="category-chips filter-panel-body"></div>
             </section>
             <section id="artist-filter-panel" class="filter-panel">
-              <button type="button" class="filter-panel-toggle" id="artist-filter-toggle" aria-expanded="true">
+              <button type="button" class="filter-panel-toggle" id="artist-filter-toggle" aria-expanded="false">
                 <span class="filter-panel-label">가수</span>
                 <span class="filter-panel-rule" aria-hidden="true"></span>
                 <span class="filter-panel-meta" id="artist-filter-meta"></span>
@@ -621,12 +651,9 @@ async function mountSongbook(slug: string) {
             <span class="text-dim">
               등록곡 <span id="song-count" class="text-main font-extrabold">0</span>곡
             </span>
-            <div class="flex items-center gap-2.5">
-              <span id="sync-label" class="text-dim">연동 중…</span>
-              <div class="view-modes" role="group" aria-label="목록 보기">
-                <button type="button" class="view-btn" id="view-list-btn" title="리스트 모드" aria-label="리스트 모드">${icons.viewList(16)}</button>
-                <button type="button" class="view-btn" id="view-button-btn" title="버튼 모드" aria-label="버튼 모드">${icons.viewButton(16)}</button>
-              </div>
+            <div class="view-modes" role="group" aria-label="목록 보기">
+              <button type="button" class="view-btn" id="view-list-btn" title="리스트 모드" aria-label="리스트 모드">${icons.viewList(16)}</button>
+              <button type="button" class="view-btn" id="view-button-btn" title="버튼 모드" aria-label="버튼 모드">${icons.viewButton(16)}</button>
             </div>
           </div>
 
@@ -638,12 +665,12 @@ async function mountSongbook(slug: string) {
             <div class="flex items-center gap-3 pb-4 mb-4 border-b border-glass-border">
               <span class="dock-art">${icons.disc(22)}</span>
               <div class="min-w-0">
-                <p class="dock-label">Now Playing</p>
-                <p id="aside-now-playing" class="song-name text-sm">현재 재생 중인 곡이 없습니다.</p>
+                <p class="dock-label">지금 재생</p>
+                <p id="aside-now-playing" class="song-name text-sm">재생 중인 곡이 없습니다.</p>
               </div>
             </div>
             <div class="flex items-center justify-between mb-3">
-              <span class="text-xs font-extrabold tracking-wide text-muted">실시간 대기열</span>
+              <span class="text-xs font-extrabold tracking-wide text-muted">대기열</span>
               <span id="aside-queue-count" class="count-badge">0</span>
             </div>
             <div id="aside-queue-list" class="space-y-2 max-h-[55vh] overflow-y-auto pr-0.5"></div>
@@ -657,8 +684,8 @@ async function mountSongbook(slug: string) {
         <div class="flex items-center gap-3 min-w-0">
           <span class="dock-art">${icons.disc(20)}</span>
           <div class="min-w-0">
-            <p class="dock-label">Now Playing</p>
-            <p id="now-playing-text" class="song-name text-sm">현재 재생 중인 곡이 없습니다.</p>
+            <p class="dock-label">지금 재생</p>
+            <p id="now-playing-text" class="song-name text-sm">재생 중인 곡이 없습니다.</p>
           </div>
         </div>
         <button id="open-queue-btn" type="button" class="secondary-btn btn-sm">
@@ -673,12 +700,12 @@ async function mountSongbook(slug: string) {
       <div id="request-modal-overlay" class="absolute inset-0"></div>
       <div class="modal-content relative">
         <div class="modal-grip"></div>
-        <p class="modal-eyebrow mb-1.5">Song Request</p>
+        <p class="modal-eyebrow mb-1.5">노래 신청</p>
         <h2 id="modal-song-title" class="text-lg font-extrabold text-main truncate"></h2>
         <p id="modal-song-artist" class="text-sm font-medium text-muted truncate mb-5"></p>
         <div class="space-y-3 mb-6">
-          <input id="req-nickname" type="text" maxlength="40" class="cm-input" placeholder="신청자 닉네임 (선택)" />
-          <input id="req-comment" type="text" maxlength="200" class="cm-input" placeholder="방송 전달 메시지 (선택)" />
+          <input id="req-nickname" type="text" maxlength="40" class="cm-input" placeholder="닉네임 (선택)" />
+          <input id="req-comment" type="text" maxlength="200" class="cm-input" placeholder="한마디 (선택)" />
         </div>
         <div class="flex gap-2.5">
           <button id="close-request-modal" type="button" class="secondary-btn flex-1">취소</button>
@@ -697,7 +724,7 @@ async function mountSongbook(slug: string) {
         <div class="flex items-center justify-between mb-4">
           <h2 class="flex items-center gap-2 text-sm font-extrabold text-main">
             <span class="text-accent">${icons.list(16)}</span>
-            실시간 대기열 목록
+            대기열
           </h2>
           <button id="close-queue-modal" type="button" class="icon-btn" aria-label="닫기">${icons.close(16)}</button>
         </div>
@@ -742,7 +769,7 @@ async function mountSongbook(slug: string) {
 
   function nowPlayingLabel(): string {
     const np = state.status?.nowPlaying;
-    return np ? `${np.title} - ${np.artist}` : "현재 재생 중인 곡이 없습니다.";
+    return np ? `${np.title} - ${np.artist}` : "재생 중인 곡이 없습니다.";
   }
 
   function applyViewMode(mode: ViewMode) {
@@ -798,7 +825,7 @@ async function mountSongbook(slug: string) {
       current = "ALL";
     }
     const chips = [
-      `<button type="button" class="chip${current === "ALL" ? " active" : ""}" data-${dataAttr}="ALL">ALL</button>`,
+      `<button type="button" class="chip${current === "ALL" ? " active" : ""}" data-${dataAttr}="ALL">전체</button>`,
       ...items.map((item) => {
         const selected = current.toLowerCase() === item.toLowerCase();
         return `<button type="button" class="chip${selected ? " active" : ""}" data-${dataAttr}="${escapeHtml(item)}">${escapeHtml(item)}</button>`;
@@ -889,14 +916,17 @@ async function mountSongbook(slug: string) {
         const categoryBadge = categoryLabel
           ? `<span class="category-badge">${escapeHtml(categoryLabel)}</span>`
           : "";
-        const genreBadge = `<span class="genre-badge">${escapeHtml(genreLabel)}</span>`;
+        const genreBadge =
+          genreLabel && genreLabel !== "미분류"
+            ? `<span class="genre-badge">${escapeHtml(genreLabel)}</span>`
+            : "";
         const diffStars = difficultyStarsHtml(song.difficulty);
-        const tagHtml =
-          otherTags.length > 0
-            ? otherTags
-                .map((t) => `<span class="tag-badge">${escapeHtml(t)}</span>`)
-                .join("")
-            : `<span class="tag-no-info">태그 없음</span>`;
+        const tagHtml = otherTags
+          .map((t) => `<span class="tag-badge">${escapeHtml(t)}</span>`)
+          .join("");
+        const hasGenreCol = Boolean(mrBadge || categoryBadge || genreBadge);
+        const hasTagsCol = otherTags.length > 0;
+        const mobileMeta = [mrBadge, categoryBadge, genreBadge].filter(Boolean).join("");
 
         if (isButton) {
           return `
@@ -915,7 +945,6 @@ async function mountSongbook(slug: string) {
                 <div class="button-meta-row">
                   ${diffStars}
                   ${mrBadgeSm}
-                  ${genreBadge}
                 </div>
               </div>
             </div>
@@ -928,20 +957,28 @@ async function mountSongbook(slug: string) {
             <div class="col col-info">
               <div class="song-name" title="${escapeHtml(song.title)}">${escapeHtml(song.title)}</div>
               <div class="song-artist-badge">${escapeHtml(song.artist)}</div>
-              <div class="list-mobile-meta">
-                ${mrBadge}
-                ${categoryBadge}
-                ${genreBadge}
-              </div>
+              ${
+                mobileMeta
+                  ? `<div class="list-mobile-meta">${mobileMeta}</div>`
+                  : ""
+              }
             </div>
-            <div class="col col-genre">
-              <div class="status-badge-wrapper">${mrBadge}</div>
+            ${
+              hasGenreCol
+                ? `<div class="col col-genre">
+              ${mrBadge ? `<div class="status-badge-wrapper">${mrBadge}</div>` : ""}
               ${categoryBadge}
               ${genreBadge}
-            </div>
-            <div class="col col-tags">
-              <div class="tag-container${otherTags.length === 0 ? " no-info" : ""}">${tagHtml}</div>
-            </div>
+            </div>`
+                : `<div class="col col-genre"></div>`
+            }
+            ${
+              hasTagsCol
+                ? `<div class="col col-tags">
+              <div class="tag-container">${tagHtml}</div>
+            </div>`
+                : `<div class="col col-tags"></div>`
+            }
             <div class="col col-action">
               ${diffStars}
               <button
@@ -1030,7 +1067,7 @@ async function mountSongbook(slug: string) {
     state.selectedSong = song;
     $("#modal-song-title").textContent = song.title;
     $("#modal-song-artist").textContent = song.artist;
-    ($("#req-nickname") as HTMLInputElement).value = "";
+    ($("#req-nickname") as HTMLInputElement).value = readStoredNickname();
     ($("#req-comment") as HTMLInputElement).value = "";
     $("#request-modal").hidden = false;
   }
@@ -1054,6 +1091,7 @@ async function mountSongbook(slug: string) {
         nickname: nickname || undefined,
         comment: comment || undefined,
       });
+      storeNickname(nickname);
       closeRequestModal();
       showToast(`${title} 신청이 완료되었습니다!`);
       await refreshQueueAndStatus();
@@ -1075,11 +1113,9 @@ async function mountSongbook(slug: string) {
       state.songs = data.songs;
       state.genres = data.genres;
       state.artists = data.artists;
-      $("#sync-label").textContent = "실시간 연동 중";
       renderFilterPanels();
       renderSongs();
     } catch (err) {
-      $("#sync-label").textContent = "연동 오류";
       console.error(err);
       if (err instanceof Error && err.message.includes("Channel not found")) {
         showToast("존재하지 않는 채널입니다.");
@@ -1237,7 +1273,6 @@ async function handleOAuthCallbackFallback(): Promise<boolean> {
   app!.innerHTML = `
     <div class="relative z-10 min-h-screen flex items-center justify-center px-4">
       <div class="panel max-w-md w-full p-8 text-center space-y-3">
-        <p class="modal-eyebrow">Auth</p>
         <h1 class="text-lg font-extrabold text-main">로그인 처리 중…</h1>
         <p class="text-sm text-muted">잠시만 기다려 주세요.</p>
       </div>

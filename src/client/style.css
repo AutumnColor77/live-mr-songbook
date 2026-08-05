@@ -1130,6 +1130,29 @@ a.secondary-btn {
   padding-top: 2px;
 }
 
+.admin-queue-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex-shrink: 0;
+  justify-content: flex-end;
+}
+
+.admin-queue-actions .admin-act.secondary-btn {
+  opacity: 0.85;
+}
+
+@media (max-width: 639px) {
+  .admin-queue-actions {
+    width: 100%;
+  }
+
+  .admin-queue-actions .admin-act.primary-btn {
+    flex: 1 1 auto;
+    min-width: 4.5rem;
+  }
+}
+
 /* --- Modals (app: .modal-overlay / .modal-content) --- */
 .modal-overlay {
   position: fixed;

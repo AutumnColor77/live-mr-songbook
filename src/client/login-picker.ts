@@ -7,12 +7,23 @@ export type LoginProviders = {
 };
 
 /** Single "로그인" button + provider picker modal. */
-export function loginButtonHtml(providers: LoginProviders): string {
+export function loginButtonHtml(
+  providers: LoginProviders,
+  label = "내 채널 시작",
+): string {
   const any = providers.googleEnabled || providers.naverEnabled;
   if (!any) {
-    return `<button type="button" class="primary-btn w-full" disabled>소셜 로그인 미설정</button>`;
+    return `<button type="button" class="primary-btn w-full" disabled>지금은 로그인을 사용할 수 없습니다</button>`;
   }
-  return `<button id="login-btn" type="button" class="primary-btn w-full">로그인</button>`;
+  return `<button id="login-btn" type="button" class="primary-btn w-full">${escapeAttr(label)}</button>`;
+}
+
+function escapeAttr(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 }
 
 export function loginPickerOverlayHtml(providers: LoginProviders): string {
@@ -32,7 +43,7 @@ export function loginPickerOverlayHtml(providers: LoginProviders): string {
       <div class="modal-content space-y-4" role="dialog" aria-modal="true" aria-labelledby="login-picker-title">
         <div class="modal-grip" aria-hidden="true"></div>
         <div class="text-center space-y-1">
-          <p class="modal-eyebrow">Sign in</p>
+          <p class="modal-eyebrow">로그인</p>
           <h2 id="login-picker-title" class="text-lg font-extrabold text-main">로그인 방법 선택</h2>
           <p class="text-xs text-dim">사용할 계정을 골라 주세요.</p>
         </div>
