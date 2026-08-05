@@ -20,11 +20,36 @@ import {
   loginButtonHtml,
   loginPickerOverlayHtml,
 } from "./login-picker";
-import type { SongRequest, StatusResponse } from "./types";
+import type { DuplicatePolicy, SongRequest, StatusResponse } from "./types";
 
 type Theme = "dark" | "light" | "pink" | "sky";
 const THEMES: Theme[] = ["dark", "light", "pink", "sky"];
 const THEME_STORAGE_KEY = "songbook-theme";
+const DUP_POLICY_ORDER: DuplicatePolicy[] = ["allow", "queue", "played"];
+
+function resolveDuplicatePolicy(status: StatusResponse | null): DuplicatePolicy {
+  if (status?.duplicatePolicy === "allow" || status?.duplicatePolicy === "queue" || status?.duplicatePolicy === "played") {
+    return status.duplicatePolicy;
+  }
+  return status?.allowDuplicateRequests === false ? "queue" : "allow";
+}
+
+function dupPolicyLabel(policy: DuplicatePolicy): string {
+  if (policy === "queue") return "대기열만 차단";
+  if (policy === "played") return "부른 곡 포함";
+  return "중복 허용";
+}
+
+function nextDuplicatePolicy(policy: DuplicatePolicy): DuplicatePolicy {
+  const idx = DUP_POLICY_ORDER.indexOf(policy);
+  return DUP_POLICY_ORDER[(idx + 1) % DUP_POLICY_ORDER.length]!;
+}
+
+function dupPolicyToast(policy: DuplicatePolicy): string {
+  if (policy === "queue") return "대기열 중복만 차단합니다.";
+  if (policy === "played") return "이번 방송에서 부른 곡도 차단합니다. 대기열 비우기로 초기화됩니다.";
+  return "중복 신청을 허용합니다.";
+}
 let adminPollTimer: number | undefined;
 
 function stopAdminPolling() {
@@ -237,7 +262,7 @@ async function mountDashboard(
               <span id="admin-queue-count" class="count-badge">0</span>
             </div>
             <div class="flex items-center gap-2 flex-wrap justify-end">
-              <button id="dup-toggle" type="button" class="secondary-btn btn-sm">중복 신청 차단</button>
+              <button id="dup-toggle" type="button" class="secondary-btn btn-sm">중복 허용</button>
               <button id="queue-clear" type="button" class="secondary-btn btn-sm">대기열 비우기</button>
             </div>
           </div>
@@ -292,11 +317,12 @@ async function mountDashboard(
     toggle.classList.toggle("primary-btn", accepting);
     toggle.classList.toggle("secondary-btn", !accepting);
 
-    const allowDup = status?.allowDuplicateRequests !== false;
+    const dupPolicy = resolveDuplicatePolicy(status);
     const dupToggle = $("#dup-toggle") as HTMLButtonElement;
-    dupToggle.textContent = allowDup ? "중복 신청 차단" : "중복 신청 허용";
-    dupToggle.classList.toggle("primary-btn", !allowDup);
-    dupToggle.classList.toggle("secondary-btn", allowDup);
+    dupToggle.textContent = dupPolicyLabel(dupPolicy);
+    dupToggle.classList.toggle("primary-btn", dupPolicy !== "allow");
+    dupToggle.classList.toggle("secondary-btn", dupPolicy === "allow");
+    dupToggle.title = "클릭하면 허용 → 대기열만 → 부른 곡 포함 순으로 바뀝니다";
 
     $("#admin-now-playing").textContent = nowPlayingLabel(status);
 
@@ -308,7 +334,7 @@ async function mountDashboard(
         return a.createdAt - b.createdAt;
       });
     $("#admin-queue-count").textContent = String(active.length);
-    ($("#queue-clear") as HTMLButtonElement).disabled = active.length === 0;
+    ($("#queue-clear") as HTMLButtonElement).disabled = false;
     const list = $("#admin-queue-list");
 
     if (active.length === 0) {
@@ -394,9 +420,9 @@ async function mountDashboard(
     if (busy || !status) return;
     busy = true;
     try {
-      const next = status.allowDuplicateRequests === false;
-      await patchAdminSettings(slug, { allowDuplicateRequests: next });
-      showToast(next ? "중복 신청을 허용합니다." : "중복 신청을 차단합니다.");
+      const next = nextDuplicatePolicy(resolveDuplicatePolicy(status));
+      await patchAdminSettings(slug, { duplicatePolicy: next });
+      showToast(dupPolicyToast(next));
       await refresh();
     } catch (err) {
       if (err instanceof AdminAuthError) {
@@ -414,13 +440,20 @@ async function mountDashboard(
     const count = requests.filter(
       (r) => r.status === "pending" || r.status === "playing",
     ).length;
-    if (count === 0) return;
-    if (!window.confirm(`대기열 ${count}곡을 모두 비웁니다. 계속할까요?`)) return;
+    const confirmMsg =
+      count > 0
+        ? `대기열 ${count}곡을 모두 비웁니다.\n부른 곡 중복 기록도 초기화됩니다. 계속할까요?`
+        : "부른 곡 중복 기록을 초기화합니다. 계속할까요?";
+    if (!window.confirm(confirmMsg)) return;
 
     busy = true;
     try {
       const cleared = await clearQueue(slug);
-      showToast(`대기열 ${cleared}곡을 비웠습니다.`);
+      showToast(
+        cleared > 0
+          ? `대기열 ${cleared}곡을 비우고 중복 기록을 초기화했습니다.`
+          : "부른 곡 중복 기록을 초기화했습니다.",
+      );
       await refresh();
     } catch (err) {
       if (err instanceof AdminAuthError) {

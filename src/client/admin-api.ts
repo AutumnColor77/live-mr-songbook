@@ -72,6 +72,7 @@ export async function patchAdminSettings(
   body: {
     acceptingRequests?: boolean;
     allowDuplicateRequests?: boolean;
+    duplicatePolicy?: "allow" | "queue" | "played";
     nowPlayingId?: string | null;
   },
 ): Promise<void> {

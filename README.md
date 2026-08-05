@@ -105,9 +105,9 @@ npx wrangler secret put NAVER_CLIENT_SECRET
 | Method | Path |
 |--------|------|
 | `GET` | `/api/c/:slug/songs?search=&genre=&artist=` → `{ songs, genres, artists }` |
-| `GET` | `/api/c/:slug/status` → `{ acceptingRequests, allowDuplicateRequests, nowPlaying, pendingCount, … }` |
+| `GET` | `/api/c/:slug/status` → `{ acceptingRequests, duplicatePolicy, allowDuplicateRequests, blockedSongIds, nowPlaying, pendingCount, … }` |
 | `GET` | `/api/c/:slug/queue` |
-| `POST` | `/api/c/:slug/requests` body `{ songId, nickname?, comment? }` (중복 차단 시 동일 곡 pending/playing이면 `409`) |
+| `POST` | `/api/c/:slug/requests` body `{ songId, nickname?, comment? }` (`duplicatePolicy`가 `queue`/`played`일 때 차단 곡은 `409`) |
 
 ### Channel admin
 
@@ -119,8 +119,8 @@ npx wrangler secret put NAVER_CLIENT_SECRET
 | `PATCH/DELETE` | `/api/c/:slug/admin/songs/:id` |
 | `GET` | `/api/c/:slug/admin/requests` |
 | `PATCH` | `/api/c/:slug/admin/requests/:id` body `{ status }` |
-| `PATCH` | `/api/c/:slug/admin/settings` body `{ acceptingRequests?, allowDuplicateRequests?, nowPlayingId? }` |
-| `POST` | `/api/c/:slug/admin/queue/clear` |
+| `PATCH` | `/api/c/:slug/admin/settings` body `{ acceptingRequests?, duplicatePolicy?: 'allow'\|'queue'\|'played', nowPlayingId? }` |
+| `POST` | `/api/c/:slug/admin/queue/clear` (대기열 reject + 부른 곡 중복 세션 초기화) |
 
 ### Platform (`Authorization: Bearer <PLATFORM_ADMIN_TOKEN>`)
 
@@ -137,7 +137,7 @@ npx wrangler secret put NAVER_CLIENT_SECRET
 - `/me/setup` — 최초 프로필(닉네임·아바타)
 - `/me` — 채널 생성/수정(표시 이름·슬러그), 프로필 편집
 - `/c/:slug` — 시청자: 검색, 접이식 **장르·가수** 필터, 리스트/버튼 모드, 썸네일·난이도, 신청·대기열·Now Playing
-- `/c/:slug/admin` — 운영: 신청 on/off, 중복 신청 허용/차단, 대기열 재생/완료/거절·비우기
+- `/c/:slug/admin` — 운영: 신청 on/off, 중복 정책(허용/대기열만/부른 곡 포함), 대기열 재생/완료/거절·비우기(세션 초기화)
 - 테마: 다크 / 라이트 / 핑크 / 스카이
 
 ## Live MR Manager 연동

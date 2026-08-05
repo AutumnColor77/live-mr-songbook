@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { requireChannelAdmin } from "../auth";
+import { isDuplicatePolicy } from "../duplicate-policy";
 import { newId } from "../id";
 import {
   mapRequest,
@@ -210,6 +211,7 @@ admin.patch("/settings", async (c) => {
   let body: {
     acceptingRequests?: boolean;
     allowDuplicateRequests?: boolean;
+    duplicatePolicy?: string;
     nowPlayingId?: string | null;
   };
   try {
@@ -227,12 +229,24 @@ admin.patch("/settings", async (c) => {
       .run();
   }
 
-  if (body.allowDuplicateRequests !== undefined) {
+  if (body.duplicatePolicy !== undefined) {
+    if (!isDuplicatePolicy(body.duplicatePolicy)) {
+      return c.json({ error: "Invalid duplicatePolicy" }, 400);
+    }
     await c.env.DB.prepare(
-      `INSERT INTO settings (channel_id, key, value) VALUES (?, 'allow_duplicate_requests', ?)
+      `INSERT INTO settings (channel_id, key, value) VALUES (?, 'duplicate_policy', ?)
        ON CONFLICT(channel_id, key) DO UPDATE SET value = excluded.value`,
     )
-      .bind(channelId, body.allowDuplicateRequests ? "true" : "false")
+      .bind(channelId, body.duplicatePolicy)
+      .run();
+  } else if (body.allowDuplicateRequests !== undefined) {
+    // Legacy boolean → map to allow/queue
+    const policy = body.allowDuplicateRequests ? "allow" : "queue";
+    await c.env.DB.prepare(
+      `INSERT INTO settings (channel_id, key, value) VALUES (?, 'duplicate_policy', ?)
+       ON CONFLICT(channel_id, key) DO UPDATE SET value = excluded.value`,
+    )
+      .bind(channelId, policy)
       .run();
   }
 
@@ -330,6 +344,7 @@ admin.get("/requests", async (c) => {
 // 'rejected' rather than 'done' so they are not counted as performed.
 admin.post("/queue/clear", async (c) => {
   const channelId = c.get("channel").id;
+  const sessionStartedAt = String(Date.now());
 
   const active = await c.env.DB.prepare(
     "SELECT COUNT(*) AS count FROM requests WHERE channel_id = ? AND status IN ('pending', 'playing')",
@@ -345,6 +360,10 @@ admin.post("/queue/clear", async (c) => {
       `INSERT INTO settings (channel_id, key, value) VALUES (?, 'now_playing_id', '')
        ON CONFLICT(channel_id, key) DO UPDATE SET value = ''`,
     ).bind(channelId),
+    c.env.DB.prepare(
+      `INSERT INTO settings (channel_id, key, value) VALUES (?, 'duplicate_session_started_at', ?)
+       ON CONFLICT(channel_id, key) DO UPDATE SET value = excluded.value`,
+    ).bind(channelId, sessionStartedAt),
   ]);
 
   return c.json({ ok: true, cleared: active?.count ?? 0 });

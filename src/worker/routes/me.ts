@@ -124,8 +124,11 @@ me.post("/channels", async (c) => {
       `INSERT INTO settings (channel_id, key, value) VALUES (?, 'now_playing_id', '')`,
     ).bind(id),
     c.env.DB.prepare(
-      `INSERT INTO settings (channel_id, key, value) VALUES (?, 'allow_duplicate_requests', 'true')`,
+      `INSERT INTO settings (channel_id, key, value) VALUES (?, 'duplicate_policy', 'allow')`,
     ).bind(id),
+    c.env.DB.prepare(
+      `INSERT INTO settings (channel_id, key, value) VALUES (?, 'duplicate_session_started_at', ?)`,
+    ).bind(id, String(createdAt)),
     c.env.DB.prepare(
       `INSERT INTO channel_members (channel_id, user_id, role, created_at)
        VALUES (?, ?, 'admin', ?)`,

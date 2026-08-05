@@ -22,10 +22,14 @@ export type SongRequest = {
   createdAt: number;
 };
 
+export type DuplicatePolicy = "allow" | "queue" | "played";
+
 export type StatusResponse = {
   channel?: { slug: string; name: string };
   acceptingRequests: boolean;
   allowDuplicateRequests?: boolean;
+  duplicatePolicy?: DuplicatePolicy;
+  blockedSongIds?: string[];
   nowPlaying: SongRequest | null;
   pendingCount: number;
 };

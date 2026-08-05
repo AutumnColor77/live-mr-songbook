@@ -1,4 +1,8 @@
 import { Hono } from "hono";
+import {
+  loadBlockedSongIds,
+  loadDuplicatePolicy,
+} from "../duplicate-policy";
 import { mapRequest, type AppEnv, type RequestRow } from "../types";
 
 const status = new Hono<AppEnv>();
@@ -16,15 +20,16 @@ status.get("/", async (c) => {
   )
     .bind(channelId)
     .first<{ value: string }>();
-  const allowDupRow = await c.env.DB.prepare(
-    "SELECT value FROM settings WHERE channel_id = ? AND key = 'allow_duplicate_requests'",
-  )
-    .bind(channelId)
-    .first<{ value: string }>();
 
   const accepting = (acceptingRow?.value ?? "true") === "true";
-  const allowDuplicateRequests = (allowDupRow?.value ?? "true") === "true";
   const nowPlayingId = nowPlayingIdRow?.value ?? "";
+  const { policy, sessionStartedAt } = await loadDuplicatePolicy(c.env.DB, channelId);
+  const blockedSongIds = await loadBlockedSongIds(
+    c.env.DB,
+    channelId,
+    policy,
+    sessionStartedAt,
+  );
 
   let nowPlaying = null;
   if (nowPlayingId) {
@@ -57,7 +62,9 @@ status.get("/", async (c) => {
       name: c.get("channel").name,
     },
     acceptingRequests: accepting,
-    allowDuplicateRequests,
+    duplicatePolicy: policy,
+    allowDuplicateRequests: policy === "allow",
+    blockedSongIds,
     nowPlaying,
     pendingCount: pending?.count ?? 0,
   });
