@@ -133,7 +133,7 @@ async function mountAccount(
             <a href="/c/${escapeHtml(own.slug)}/admin" class="primary-btn btn-sm flex-1 text-center">운영하기</a>
             <a href="/c/${escapeHtml(own.slug)}" class="secondary-btn btn-sm flex-1 text-center" target="_blank" rel="noopener">노래책 열기</a>
           </div>
-          <button type="button" id="copy-channel-url" class="secondary-btn btn-sm w-full">공개 주소 복사</button>
+          <button type="button" id="copy-channel-url" class="secondary-btn btn-sm w-full">노래책 주소 복사</button>
           <details class="border-t border-glass-border pt-3">
             <summary class="cursor-pointer text-xs font-extrabold text-dim tracking-wide text-center list-none">채널 설정</summary>
             <form id="edit-channel-form" class="mt-3 space-y-3" data-channel-id="${escapeHtml(own.id)}">
@@ -142,7 +142,7 @@ async function mountAccount(
                 <input id="edit-channel-name" type="text" maxlength="80" required class="w-full rounded-xl border border-glass-border bg-[var(--surface-3)] px-3 py-2.5 text-sm text-main" value="${escapeHtml(own.name)}" />
               </label>
               <label class="block text-left space-y-1.5">
-                <span class="text-xs font-extrabold text-dim tracking-wide">공개 주소</span>
+                <span class="text-xs font-extrabold text-dim tracking-wide">노래책 주소</span>
                 <span class="flex items-center gap-1.5">
                   <span class="text-xs text-dim shrink-0">/c/</span>
                   <input id="edit-channel-slug" type="text" maxlength="63" required pattern="[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?" class="w-full rounded-xl border border-glass-border bg-[var(--surface-3)] px-3 py-2.5 text-sm text-main" value="${escapeHtml(own.slug)}" />
@@ -185,7 +185,7 @@ async function mountAccount(
             </div>
             ${
               notice
-                ? `<p class="text-sm font-semibold" style="color:${notice.startsWith("로그인") || notice.startsWith("저장") || notice.startsWith("채널") || notice.startsWith("공개") ? "#4ade80" : "#f87171"}">${escapeHtml(notice)}</p>`
+                ? `<p class="text-sm font-semibold" style="color:${notice.startsWith("로그인") || notice.startsWith("저장") || notice.startsWith("채널") || notice.startsWith("노래책") ? "#4ade80" : "#f87171"}">${escapeHtml(notice)}</p>`
                 : ""
             }
           </div>
@@ -204,7 +204,7 @@ async function mountAccount(
               <input id="channel-name" type="text" maxlength="80" required class="w-full rounded-xl border border-glass-border bg-[var(--surface-2)] px-3 py-2.5 text-sm text-main" placeholder="예: 가을색의 노래책" value="${escapeHtml(user.name ? `${user.name}의 노래책` : "")}" />
             </label>
             <p id="channel-url-hint" class="text-xs text-dim text-left leading-relaxed">
-              공개 주소는 자동으로 만들어집니다. 나중에 바꿀 수 있어요.
+              노래책 주소는 자동으로 만들어집니다. 나중에 바꿀 수 있어요.
             </p>
             <details id="slug-details" class="text-left">
               <summary class="cursor-pointer text-xs font-extrabold text-dim tracking-wide">주소 직접 지정</summary>
@@ -233,7 +233,6 @@ async function mountAccount(
                 ? `<a href="${escapeHtml(nextPath)}" class="secondary-btn w-full">돌아가기</a>`
                 : ""
             }
-            <a href="/c/demo" class="secondary-btn w-full">데모 체험</a>
             <a href="/" class="secondary-btn w-full">홈으로</a>
           </div>
         </div>
@@ -257,7 +256,7 @@ async function mountAccount(
     copyBtn.addEventListener("click", async () => {
       try {
         await navigator.clipboard.writeText(publicUrl);
-        showAccountToast("공개 주소를 복사했습니다.");
+        showAccountToast("노래책 주소를 복사했습니다.");
       } catch {
         showAccountToast("복사에 실패했습니다.");
       }
@@ -333,7 +332,7 @@ async function mountAccount(
           user,
           session?.channels ?? [{ ...updated }],
           slugChanged
-            ? "공개 주소가 바뀌었습니다. 새 주소를 복사해 공유하세요."
+            ? "노래책 주소가 바뀌었습니다. 새 주소를 복사해 공유하세요."
             : "채널이 저장되었습니다.",
         );
       } catch (err) {
@@ -423,9 +422,6 @@ function mountLanding(
               : ""
           }
           ${authBlock}
-          <div class="border-t border-glass-border pt-5 space-y-3">
-            <a href="/c/demo" class="secondary-btn w-full">데모 체험</a>
-          </div>
         </div>
       </main>
       ${loginPickerOverlayHtml(providers)}

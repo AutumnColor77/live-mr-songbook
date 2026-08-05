@@ -179,7 +179,7 @@ async function mountDashboard(
               }
               <span class="text-xs text-dim hidden md:inline truncate max-w-[140px]" title="${escapeHtml(user.email)}">${escapeHtml(user.name || user.email)}</span>
             </a>
-            <a href="/c/${escapeHtml(slug)}" class="secondary-btn btn-sm hidden sm:inline-flex" target="_blank" rel="noopener">공개 페이지</a>
+            <a href="/c/${escapeHtml(slug)}" class="secondary-btn btn-sm hidden sm:inline-flex" target="_blank" rel="noopener">노래책 열기</a>
             <button id="theme-btn" type="button" class="icon-btn" title="테마 변경" aria-label="테마 변경">${icons.palette(18)}</button>
             <button id="admin-logout" type="button" class="secondary-btn btn-sm">로그아웃</button>
           </div>
