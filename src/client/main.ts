@@ -1008,6 +1008,7 @@ async function mountSongbook(slug: string) {
                   ${diffStars}
                   ${donationBadge}
                   ${mrBadgeSm}
+                  ${genreBadge}
                 </div>
               </div>
             </div>
