@@ -6,10 +6,6 @@ export function setChannelSlug(slug: string) {
   channelSlug = slug;
 }
 
-export function getChannelSlug(): string {
-  return channelSlug;
-}
-
 function apiBase(): string {
   if (!channelSlug) throw new Error("Channel slug is not set");
   return `/api/c/${encodeURIComponent(channelSlug)}`;

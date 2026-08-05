@@ -39,43 +39,6 @@ export function setOAuthStateCookie(c: Context<AppEnv>, state: string): void {
   });
 }
 
-export async function saveOAuthState(
-  db: D1Database,
-  state: string,
-  nextPath: string,
-): Promise<void> {
-  const expiresAt = Date.now() + 1000 * 60 * 10;
-  await db
-    .prepare("INSERT INTO oauth_states (state, expires_at, next_path) VALUES (?, ?, ?)")
-    .bind(state, expiresAt, nextPath)
-    .run();
-  await db.prepare("DELETE FROM oauth_states WHERE expires_at < ?").bind(Date.now()).run();
-}
-
-export async function consumeOAuthState(
-  db: D1Database,
-  state: string,
-): Promise<{ ok: true; nextPath: string } | { ok: false }> {
-  const now = Date.now();
-  const row = await db
-    .prepare(
-      "SELECT state, next_path FROM oauth_states WHERE state = ? AND expires_at > ?",
-    )
-    .bind(state, now)
-    .first<{ state: string; next_path: string }>();
-
-  if (!row) return { ok: false };
-
-  await db.prepare("DELETE FROM oauth_states WHERE state = ?").bind(state).run();
-  return { ok: true, nextPath: row.next_path || "/me" };
-}
-
-export function takeOAuthStateCookie(c: Context<AppEnv>): string | null {
-  const state = getCookie(c, OAUTH_STATE_COOKIE) ?? null;
-  deleteCookie(c, OAUTH_STATE_COOKIE, { path: "/" });
-  return state;
-}
-
 export async function createSessionToken(db: D1Database, userId: string): Promise<string> {
   const token = randomToken();
   const tokenHash = await sha256Hex(token);
@@ -273,13 +236,4 @@ export async function updateUserProfile(
     .run();
 
   return db.prepare("SELECT * FROM users WHERE id = ?").bind(userId).first<UserRow>();
-}
-
-/** @deprecated use upsertOAuthUser */
-export async function upsertGoogleUser(
-  db: D1Database,
-  profile: { sub: string; email: string; name: string; picture: string },
-): Promise<UserRow> {
-  const { user } = await upsertOAuthUser(db, { provider: "google", ...profile });
-  return user;
 }

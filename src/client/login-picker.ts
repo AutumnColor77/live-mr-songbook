@@ -1,5 +1,6 @@
-import { icons } from "./icons";
 import { startOAuthLogin, type OAuthProvider } from "./auth-api";
+import { escapeHtml } from "./dom";
+import { icons } from "./icons";
 
 export type LoginProviders = {
   googleEnabled: boolean;
@@ -15,15 +16,7 @@ export function loginButtonHtml(
   if (!any) {
     return `<button type="button" class="primary-btn w-full" disabled>지금은 로그인을 사용할 수 없습니다</button>`;
   }
-  return `<button id="login-btn" type="button" class="primary-btn w-full">${escapeAttr(label)}</button>`;
-}
-
-function escapeAttr(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/"/g, "&quot;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+  return `<button id="login-btn" type="button" class="primary-btn w-full">${escapeHtml(label)}</button>`;
 }
 
 export function loginPickerOverlayHtml(providers: LoginProviders): string {

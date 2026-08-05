@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { seedDefaultChannelSettings } from "../channel-settings";
 import { sha256Hex, SLUG_RE } from "../crypto";
 import { newId } from "../id";
 import { loadUserFromSession, randomToken } from "../session";
@@ -117,18 +118,7 @@ me.post("/channels", async (c) => {
       `INSERT INTO channels (id, slug, name, admin_token_hash, created_at)
        VALUES (?, ?, ?, ?, ?)`,
     ).bind(id, slug, name, adminTokenHash, createdAt),
-    c.env.DB.prepare(
-      `INSERT INTO settings (channel_id, key, value) VALUES (?, 'accepting_requests', 'true')`,
-    ).bind(id),
-    c.env.DB.prepare(
-      `INSERT INTO settings (channel_id, key, value) VALUES (?, 'now_playing_id', '')`,
-    ).bind(id),
-    c.env.DB.prepare(
-      `INSERT INTO settings (channel_id, key, value) VALUES (?, 'duplicate_policy', 'allow')`,
-    ).bind(id),
-    c.env.DB.prepare(
-      `INSERT INTO settings (channel_id, key, value) VALUES (?, 'duplicate_session_started_at', ?)`,
-    ).bind(id, String(createdAt)),
+    ...seedDefaultChannelSettings(c.env.DB, id, createdAt),
     c.env.DB.prepare(
       `INSERT INTO channel_members (channel_id, user_id, role, created_at)
        VALUES (?, ?, 'admin', ?)`,

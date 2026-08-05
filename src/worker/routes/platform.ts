@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { requirePlatformAdmin } from "../auth";
+import { seedDefaultChannelSettings } from "../channel-settings";
 import { sha256Hex, SLUG_RE } from "../crypto";
 import { newId } from "../id";
 import type { AppEnv, ChannelRow } from "../types";
@@ -50,20 +51,7 @@ platform.post("/channels", async (c) => {
     .bind(id, slug, name, adminTokenHash, createdAt)
     .run();
 
-  await c.env.DB.batch([
-    c.env.DB.prepare(
-      `INSERT INTO settings (channel_id, key, value) VALUES (?, 'accepting_requests', 'true')`,
-    ).bind(id),
-    c.env.DB.prepare(
-      `INSERT INTO settings (channel_id, key, value) VALUES (?, 'now_playing_id', '')`,
-    ).bind(id),
-    c.env.DB.prepare(
-      `INSERT INTO settings (channel_id, key, value) VALUES (?, 'duplicate_policy', 'allow')`,
-    ).bind(id),
-    c.env.DB.prepare(
-      `INSERT INTO settings (channel_id, key, value) VALUES (?, 'duplicate_session_started_at', ?)`,
-    ).bind(id, String(createdAt)),
-  ]);
+  await c.env.DB.batch(seedDefaultChannelSettings(c.env.DB, id, createdAt));
 
   const channel = await c.env.DB.prepare("SELECT id, slug, name, created_at FROM channels WHERE id = ?")
     .bind(id)

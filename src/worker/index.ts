@@ -10,6 +10,7 @@ import admin from "./routes/admin";
 import platform from "./routes/platform";
 import authRoutes from "./routes/auth";
 import meRoutes from "./routes/me";
+import legacyGone from "./routes/legacy-gone";
 
 const app = new Hono<AppEnv>();
 
@@ -37,14 +38,7 @@ channelApi.route("/admin", admin);
 
 app.route("/api/c/:slug", channelApi);
 
-// Legacy global routes — removed after multi-tenant cutover
-app.all("/api/songs", (c) => c.json({ error: "Gone. Use /api/c/:slug/songs" }, 410));
-app.all("/api/songs/*", (c) => c.json({ error: "Gone. Use /api/c/:slug/songs" }, 410));
-app.all("/api/status", (c) => c.json({ error: "Gone. Use /api/c/:slug/status" }, 410));
-app.all("/api/queue", (c) => c.json({ error: "Gone. Use /api/c/:slug/queue" }, 410));
-app.all("/api/requests", (c) => c.json({ error: "Gone. Use /api/c/:slug/requests" }, 410));
-app.all("/api/admin", (c) => c.json({ error: "Gone. Use /api/c/:slug/admin" }, 410));
-app.all("/api/admin/*", (c) => c.json({ error: "Gone. Use /api/c/:slug/admin" }, 410));
+app.route("/api", legacyGone);
 
 app.notFound((c) => {
   if (c.req.path.startsWith("/api/")) {

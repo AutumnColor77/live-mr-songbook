@@ -142,14 +142,6 @@ export async function startOAuthLogin(
   return data.url;
 }
 
-export async function startGoogleLogin(next = "/me"): Promise<string> {
-  return startOAuthLogin("google", next);
-}
-
-export async function startNaverLogin(next = "/me"): Promise<string> {
-  return startOAuthLogin("naver", next);
-}
-
 export async function updateProfile(input: {
   name: string;
   picture: string;
@@ -220,14 +212,10 @@ export async function exchangeOAuthCode(
   }
 }
 
-export async function exchangeGoogleCode(code: string, state: string) {
-  return exchangeOAuthCode("google", code, state);
-}
-
 /** Resize/compress image file to a small JPEG data URL for profile storage. */
-export const PROFILE_IMAGE_MAX_SIDE = 125;
+const PROFILE_IMAGE_MAX_SIDE = 125;
 /** Max stored data-URL length (~125KB text). */
-export const PROFILE_IMAGE_MAX_DATA_URL_CHARS = 125_000;
+const PROFILE_IMAGE_MAX_DATA_URL_CHARS = 125_000;
 
 export async function fileToProfileDataUrl(file: File): Promise<string> {
   if (!file.type.startsWith("image/")) {
