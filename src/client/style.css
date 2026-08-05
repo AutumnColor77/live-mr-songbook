@@ -1044,6 +1044,71 @@ a.secondary-btn {
   border-radius: 8px;
 }
 
+/* --- Admin duplicate-policy controls --- */
+.dup-past-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  height: 38px;
+  padding: 0 12px 0 14px;
+  border-radius: 999px;
+  border: 1px solid var(--glass-border);
+  background: var(--surface-1);
+  cursor: pointer;
+  user-select: none;
+}
+
+.dup-past-switch.is-disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.dup-past-switch.is-disabled .switch {
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.dup-past-switch-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-main);
+  white-space: nowrap;
+}
+
+.switch {
+  position: relative;
+  width: 40px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: var(--surface-3);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.2s ease;
+}
+
+.switch-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--text-main);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.2);
+  transition: transform 0.2s ease;
+}
+
+.switch.is-on {
+  background: var(--accent-primary);
+}
+
+.switch.is-on .switch-thumb {
+  transform: translateX(18px);
+  background: #fff;
+}
+
 /* --- Panels (app: .modal-content / .dock-more-popover glass) --- */
 .panel {
   background: var(--glass-bg);

@@ -25,29 +25,23 @@ import type { DuplicatePolicy, SongRequest, StatusResponse } from "./types";
 type Theme = "dark" | "light" | "pink" | "sky";
 const THEMES: Theme[] = ["dark", "light", "pink", "sky"];
 const THEME_STORAGE_KEY = "songbook-theme";
-const DUP_POLICY_ORDER: DuplicatePolicy[] = ["allow", "queue", "played"];
 
 function resolveDuplicatePolicy(status: StatusResponse | null): DuplicatePolicy {
-  if (status?.duplicatePolicy === "allow" || status?.duplicatePolicy === "queue" || status?.duplicatePolicy === "played") {
+  if (
+    status?.duplicatePolicy === "allow" ||
+    status?.duplicatePolicy === "queue" ||
+    status?.duplicatePolicy === "played"
+  ) {
     return status.duplicatePolicy;
   }
   return status?.allowDuplicateRequests === false ? "queue" : "allow";
 }
 
-function dupPolicyLabel(policy: DuplicatePolicy): string {
-  if (policy === "queue") return "대기열만 차단";
-  if (policy === "played") return "부른 곡 포함";
-  return "중복 허용";
-}
-
-function nextDuplicatePolicy(policy: DuplicatePolicy): DuplicatePolicy {
-  const idx = DUP_POLICY_ORDER.indexOf(policy);
-  return DUP_POLICY_ORDER[(idx + 1) % DUP_POLICY_ORDER.length]!;
-}
-
 function dupPolicyToast(policy: DuplicatePolicy): string {
   if (policy === "queue") return "대기열 중복만 차단합니다.";
-  if (policy === "played") return "이번 방송에서 부른 곡도 차단합니다. 대기열 비우기로 초기화됩니다.";
+  if (policy === "played") {
+    return "이번 방송에서 부른 곡도 차단합니다. 대기열 비우기로 초기화됩니다.";
+  }
   return "중복 신청을 허용합니다.";
 }
 let adminPollTimer: number | undefined;
@@ -262,7 +256,20 @@ async function mountDashboard(
               <span id="admin-queue-count" class="count-badge">0</span>
             </div>
             <div class="flex items-center gap-2 flex-wrap justify-end">
-              <button id="dup-toggle" type="button" class="secondary-btn btn-sm">중복 허용</button>
+              <label id="dup-past-wrap" class="dup-past-switch" title="완료된 곡도 이번 방송에서 다시 신청하지 못하게 합니다">
+                <span class="dup-past-switch-label">과거 곡도 차단</span>
+                <button
+                  id="dup-past-toggle"
+                  type="button"
+                  class="switch"
+                  role="switch"
+                  aria-checked="false"
+                  aria-label="과거 곡도 차단"
+                >
+                  <span class="switch-thumb"></span>
+                </button>
+              </label>
+              <button id="dup-toggle" type="button" class="secondary-btn btn-sm">중복 신청 허용</button>
               <button id="queue-clear" type="button" class="secondary-btn btn-sm">대기열 비우기</button>
             </div>
           </div>
@@ -277,6 +284,8 @@ async function mountDashboard(
   let requests: SongRequest[] = [];
   let busy = false;
   let toastTimer: number | undefined;
+  /** Remember past-block preference while policy is allow. */
+  let preferPlayed = false;
 
   function showToast(message: string) {
     const toast = $("#toast");
@@ -318,11 +327,28 @@ async function mountDashboard(
     toggle.classList.toggle("secondary-btn", !accepting);
 
     const dupPolicy = resolveDuplicatePolicy(status);
+    if (dupPolicy === "played") preferPlayed = true;
+    if (dupPolicy === "queue") preferPlayed = false;
+
+    const blocking = dupPolicy !== "allow";
+    const pastOn = dupPolicy === "played";
+    const pastWrap = $("#dup-past-wrap");
+    const pastToggle = $("#dup-past-toggle") as HTMLButtonElement;
+    pastToggle.setAttribute("aria-checked", pastOn ? "true" : "false");
+    pastToggle.classList.toggle("is-on", pastOn);
+    pastToggle.disabled = !blocking;
+    pastWrap.classList.toggle("is-disabled", !blocking);
+    pastWrap.title = blocking
+      ? "완료된 곡도 이번 방송에서 다시 신청하지 못하게 합니다"
+      : "중복 신청을 차단한 뒤에 사용할 수 있습니다";
+
     const dupToggle = $("#dup-toggle") as HTMLButtonElement;
-    dupToggle.textContent = dupPolicyLabel(dupPolicy);
-    dupToggle.classList.toggle("primary-btn", dupPolicy !== "allow");
-    dupToggle.classList.toggle("secondary-btn", dupPolicy === "allow");
-    dupToggle.title = "클릭하면 허용 → 대기열만 → 부른 곡 포함 순으로 바뀝니다";
+    dupToggle.textContent = blocking ? "중복 신청 차단" : "중복 신청 허용";
+    dupToggle.classList.toggle("primary-btn", blocking);
+    dupToggle.classList.toggle("secondary-btn", !blocking);
+    dupToggle.title = blocking
+      ? "클릭하면 중복 신청을 다시 허용합니다"
+      : "클릭하면 대기열 중복을 차단합니다";
 
     $("#admin-now-playing").textContent = nowPlayingLabel(status);
 
@@ -420,7 +446,32 @@ async function mountDashboard(
     if (busy || !status) return;
     busy = true;
     try {
-      const next = nextDuplicatePolicy(resolveDuplicatePolicy(status));
+      const current = resolveDuplicatePolicy(status);
+      const next: DuplicatePolicy =
+        current === "allow" ? (preferPlayed ? "played" : "queue") : "allow";
+      await patchAdminSettings(slug, { duplicatePolicy: next });
+      showToast(dupPolicyToast(next));
+      await refresh();
+    } catch (err) {
+      if (err instanceof AdminAuthError) {
+        mountLogin(root, slug, "세션이 만료되었습니다. 다시 로그인해 주세요.");
+        return;
+      }
+      showToast(err instanceof Error ? err.message : "설정 변경 실패");
+    } finally {
+      busy = false;
+    }
+  });
+
+  $("#dup-past-toggle").addEventListener("click", async () => {
+    if (busy || !status) return;
+    const current = resolveDuplicatePolicy(status);
+    if (current === "allow") return;
+
+    busy = true;
+    try {
+      const next: DuplicatePolicy = current === "played" ? "queue" : "played";
+      preferPlayed = next === "played";
       await patchAdminSettings(slug, { duplicatePolicy: next });
       showToast(dupPolicyToast(next));
       await refresh();
