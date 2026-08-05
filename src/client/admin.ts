@@ -5,6 +5,7 @@ import {
   fetchPublicStatus,
   patchAdminSettings,
   patchRequestStatus,
+  reorderQueue,
   verifyAdminAccess,
 } from "./admin-api";
 import {
@@ -355,8 +356,9 @@ async function mountDashboard(
     const active = requests
       .filter((r) => r.status === "pending" || r.status === "playing")
       .sort((a, b) => {
-        if (a.status === "playing" && b.status !== "playing") return -1;
-        if (b.status === "playing" && a.status !== "playing") return 1;
+        const ao = a.sortOrder ?? a.createdAt;
+        const bo = b.sortOrder ?? b.createdAt;
+        if (ao !== bo) return ao - bo;
         return a.createdAt - b.createdAt;
       });
     $("#admin-queue-count").textContent = String(active.length);
@@ -378,7 +380,8 @@ async function mountDashboard(
           ? `<p class="text-[11px] font-medium text-dim mt-0.5">${escapeHtml(item.comment)}</p>`
           : "";
         return `
-          <div class="queue-row !items-center" data-id="${escapeHtml(item.id)}">
+          <div class="queue-row admin-queue-row !items-center" draggable="true" data-id="${escapeHtml(item.id)}">
+            <span class="queue-drag-handle" title="드래그하여 순서 변경" aria-hidden="true">⋮⋮</span>
             <span class="queue-index">${index + 1}</span>
             <div class="min-w-0 flex-1">
               <div class="flex items-center gap-2 flex-wrap">
@@ -517,7 +520,10 @@ async function mountDashboard(
     }
   });
 
-  $("#admin-queue-list").addEventListener("click", async (e) => {
+  const queueList = $("#admin-queue-list");
+  let dragId: string | null = null;
+
+  queueList.addEventListener("click", async (e) => {
     const btn = (e.target as HTMLElement).closest<HTMLButtonElement>(".admin-act");
     if (!btn || btn.disabled || busy) return;
     const id = btn.dataset.id ?? "";
@@ -536,6 +542,99 @@ async function mountDashboard(
         return;
       }
       showToast(err instanceof Error ? err.message : "처리 실패");
+    } finally {
+      busy = false;
+    }
+  });
+
+  queueList.addEventListener("dragstart", (e) => {
+    const row = (e.target as HTMLElement).closest<HTMLElement>(".admin-queue-row");
+    if (!row || busy) {
+      e.preventDefault();
+      return;
+    }
+    if ((e.target as HTMLElement).closest("button")) {
+      e.preventDefault();
+      return;
+    }
+    dragId = row.dataset.id ?? null;
+    row.classList.add("is-dragging");
+    e.dataTransfer?.setData("text/plain", dragId ?? "");
+    if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
+  });
+
+  queueList.addEventListener("dragend", () => {
+    queueList.querySelectorAll(".admin-queue-row").forEach((el) => {
+      el.classList.remove("is-dragging", "drag-over");
+    });
+    dragId = null;
+  });
+
+  queueList.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    if (!dragId) return;
+    const row = (e.target as HTMLElement).closest<HTMLElement>(".admin-queue-row");
+    if (!row || row.dataset.id === dragId) return;
+    queueList.querySelectorAll(".admin-queue-row.drag-over").forEach((el) => {
+      el.classList.remove("drag-over");
+    });
+    row.classList.add("drag-over");
+    if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
+  });
+
+  queueList.addEventListener("dragleave", (e) => {
+    const row = (e.target as HTMLElement).closest<HTMLElement>(".admin-queue-row");
+    if (row) row.classList.remove("drag-over");
+  });
+
+  queueList.addEventListener("drop", async (e) => {
+    e.preventDefault();
+    const target = (e.target as HTMLElement).closest<HTMLElement>(".admin-queue-row");
+    queueList.querySelectorAll(".admin-queue-row").forEach((el) => {
+      el.classList.remove("drag-over", "is-dragging");
+    });
+    const fromId = dragId || e.dataTransfer?.getData("text/plain") || "";
+    dragId = null;
+    if (!fromId || !target || busy) return;
+    const toId = target.dataset.id ?? "";
+    if (!toId || fromId === toId) return;
+
+    const rows = Array.from(queueList.querySelectorAll<HTMLElement>(".admin-queue-row"));
+    const fromEl = rows.find((r) => r.dataset.id === fromId);
+    if (!fromEl) return;
+
+    const fromIndex = rows.indexOf(fromEl);
+    const toIndex = rows.indexOf(target);
+    if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) return;
+
+    if (fromIndex < toIndex) {
+      target.after(fromEl);
+    } else {
+      target.before(fromEl);
+    }
+
+    queueList.querySelectorAll(".admin-queue-row .queue-index").forEach((el, i) => {
+      el.textContent = String(i + 1);
+    });
+
+    const ids = Array.from(queueList.querySelectorAll<HTMLElement>(".admin-queue-row"))
+      .map((r) => r.dataset.id ?? "")
+      .filter(Boolean);
+
+    busy = true;
+    try {
+      await reorderQueue(slug, ids);
+      for (let i = 0; i < ids.length; i++) {
+        const req = requests.find((r) => r.id === ids[i]);
+        if (req) req.sortOrder = i;
+      }
+    } catch (err) {
+      if (err instanceof AdminAuthError) {
+        mountLogin(root, slug, "세션이 만료되었습니다. 다시 로그인해 주세요.");
+        return;
+      }
+      showToast(err instanceof Error ? err.message : "순서 변경 실패");
+      await refresh();
     } finally {
       busy = false;
     }

@@ -20,6 +20,7 @@ export type SongRequest = {
   comment: string;
   status: string;
   createdAt: number;
+  sortOrder?: number;
 };
 
 export type DuplicatePolicy = "allow" | "queue" | "played";

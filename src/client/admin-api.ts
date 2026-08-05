@@ -67,6 +67,13 @@ export async function clearQueue(slug: string): Promise<number> {
   return data.cleared;
 }
 
+export async function reorderQueue(slug: string, ids: string[]): Promise<void> {
+  await adminFetch<{ ok: boolean }>(slug, "/queue/reorder", {
+    method: "POST",
+    body: JSON.stringify({ ids }),
+  });
+}
+
 export async function patchAdminSettings(
   slug: string,
   body: {

@@ -65,11 +65,20 @@ requests.post("/", async (c) => {
   const id = newId("req");
   const createdAt = Date.now();
 
-  await c.env.DB.prepare(
-    `INSERT INTO requests (id, channel_id, song_id, title, artist, nickname, comment, status, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
+  const maxSort = await c.env.DB.prepare(
+    `SELECT MAX(sort_order) AS maxSort FROM requests
+     WHERE channel_id = ? AND status IN ('pending', 'playing')`,
   )
-    .bind(id, channelId, song.id, song.title, song.artist, nickname, comment, createdAt)
+    .bind(channelId)
+    .first<{ maxSort: number | null }>();
+  const sortOrder =
+    typeof maxSort?.maxSort === "number" ? maxSort.maxSort + 1 : createdAt;
+
+  await c.env.DB.prepare(
+    `INSERT INTO requests (id, channel_id, song_id, title, artist, nickname, comment, status, created_at, sort_order)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
+  )
+    .bind(id, channelId, song.id, song.title, song.artist, nickname, comment, createdAt, sortOrder)
     .run();
 
   const row = await c.env.DB.prepare("SELECT * FROM requests WHERE id = ?")

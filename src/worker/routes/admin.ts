@@ -333,7 +333,9 @@ admin.patch("/requests/:id", async (c) => {
 admin.get("/requests", async (c) => {
   const channelId = c.get("channel").id;
   const { results } = await c.env.DB.prepare(
-    "SELECT * FROM requests WHERE channel_id = ? ORDER BY created_at DESC LIMIT 200",
+    `SELECT * FROM requests WHERE channel_id = ?
+     ORDER BY sort_order ASC, created_at ASC
+     LIMIT 200`,
   )
     .bind(channelId)
     .all<RequestRow>();
@@ -367,6 +369,48 @@ admin.post("/queue/clear", async (c) => {
   ]);
 
   return c.json({ ok: true, cleared: active?.count ?? 0 });
+});
+
+admin.post("/queue/reorder", async (c) => {
+  const channelId = c.get("channel").id;
+  let body: { ids?: unknown };
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "Invalid JSON body" }, 400);
+  }
+
+  const ids = Array.isArray(body.ids)
+    ? body.ids.filter((id): id is string => typeof id === "string" && id.length > 0)
+    : [];
+  if (ids.length === 0) {
+    return c.json({ error: "ids array is required" }, 400);
+  }
+  if (new Set(ids).size !== ids.length) {
+    return c.json({ error: "ids must be unique" }, 400);
+  }
+
+  const { results } = await c.env.DB.prepare(
+    `SELECT id FROM requests
+     WHERE channel_id = ? AND status IN ('pending', 'playing')`,
+  )
+    .bind(channelId)
+    .all<{ id: string }>();
+
+  const activeIds = new Set((results ?? []).map((r) => r.id));
+  if (activeIds.size !== ids.length || ids.some((id) => !activeIds.has(id))) {
+    return c.json({ error: "ids must match the current active queue exactly" }, 400);
+  }
+
+  await c.env.DB.batch(
+    ids.map((id, index) =>
+      c.env.DB.prepare(
+        "UPDATE requests SET sort_order = ? WHERE id = ? AND channel_id = ?",
+      ).bind(index, id, channelId),
+    ),
+  );
+
+  return c.json({ ok: true });
 });
 
 export default admin;

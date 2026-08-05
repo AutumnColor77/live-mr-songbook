@@ -81,6 +81,7 @@ export type RequestRow = {
   comment: string;
   status: string;
   created_at: number;
+  sort_order: number;
 };
 
 export type Song = {
@@ -134,6 +135,7 @@ export type SongRequest = {
   comment: string;
   status: string;
   createdAt: number;
+  sortOrder: number;
 };
 
 export function mapSong(row: SongRow): Song {
@@ -174,5 +176,6 @@ export function mapRequest(row: RequestRow): SongRequest {
     comment: row.comment,
     status: row.status,
     createdAt: row.created_at,
+    sortOrder: typeof row.sort_order === "number" ? row.sort_order : row.created_at,
   };
 }
