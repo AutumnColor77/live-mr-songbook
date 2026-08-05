@@ -157,6 +157,23 @@ Live MR Manager 톤앤매너 + 브랜드 에셋(`public/icon-*.png`, `logo-on-*.
 
 ## Deploy
 
+`main` 브랜치에 push하면 GitHub Actions가 자동으로 `npm run deploy`를 실행합니다 (`.github/workflows/deploy.yml`).
+
+저장소 **Settings → Secrets and variables → Actions**에 아래 시크릿을 등록하세요.
+
+| Secret | 설명 |
+|--------|------|
+| `CLOUDFLARE_API_TOKEN` | Cloudflare 대시보드 → **Edit Cloudflare Workers** 템플릿으로 생성한 API 토큰 |
+| `CLOUDFLARE_ACCOUNT_ID` | Workers 개요 페이지 URL의 계정 ID |
+
+D1 마이그레이션은 자동 배포에 포함되지 않습니다. 스키마 변경 시 수동 실행:
+
+```bash
+npm run db:migrate:remote
+```
+
+최초 1회·로컬 수동 배포:
+
 ```bash
 npx wrangler login
 npx wrangler d1 create live-mr-songbook   # database_id → wrangler.toml (최초 1회)
