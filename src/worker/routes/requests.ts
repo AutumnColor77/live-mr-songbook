@@ -38,6 +38,26 @@ requests.post("/", async (c) => {
     return c.json({ error: "Song not found" }, 404);
   }
 
+  const allowDupRow = await c.env.DB.prepare(
+    "SELECT value FROM settings WHERE channel_id = ? AND key = 'allow_duplicate_requests'",
+  )
+    .bind(channelId)
+    .first<{ value: string }>();
+  const allowDuplicateRequests = (allowDupRow?.value ?? "true") === "true";
+
+  if (!allowDuplicateRequests) {
+    const existing = await c.env.DB.prepare(
+      `SELECT id FROM requests
+       WHERE channel_id = ? AND song_id = ? AND status IN ('pending', 'playing')
+       LIMIT 1`,
+    )
+      .bind(channelId, song.id)
+      .first<{ id: string }>();
+    if (existing) {
+      return c.json({ error: "이미 대기열에 있는 곡입니다." }, 409);
+    }
+  }
+
   const nicknameRaw = typeof body.nickname === "string" ? body.nickname.trim() : "";
   const commentRaw = typeof body.comment === "string" ? body.comment.trim() : "";
   const nickname = nicknameRaw.slice(0, 40) || "익명";

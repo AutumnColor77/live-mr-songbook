@@ -207,7 +207,11 @@ admin.delete("/songs/:id", async (c) => {
 
 admin.patch("/settings", async (c) => {
   const channelId = c.get("channel").id;
-  let body: { acceptingRequests?: boolean; nowPlayingId?: string | null };
+  let body: {
+    acceptingRequests?: boolean;
+    allowDuplicateRequests?: boolean;
+    nowPlayingId?: string | null;
+  };
   try {
     body = await c.req.json();
   } catch {
@@ -220,6 +224,15 @@ admin.patch("/settings", async (c) => {
        ON CONFLICT(channel_id, key) DO UPDATE SET value = excluded.value`,
     )
       .bind(channelId, body.acceptingRequests ? "true" : "false")
+      .run();
+  }
+
+  if (body.allowDuplicateRequests !== undefined) {
+    await c.env.DB.prepare(
+      `INSERT INTO settings (channel_id, key, value) VALUES (?, 'allow_duplicate_requests', ?)
+       ON CONFLICT(channel_id, key) DO UPDATE SET value = excluded.value`,
+    )
+      .bind(channelId, body.allowDuplicateRequests ? "true" : "false")
       .run();
   }
 

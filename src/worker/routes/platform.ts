@@ -57,6 +57,9 @@ platform.post("/channels", async (c) => {
     c.env.DB.prepare(
       `INSERT INTO settings (channel_id, key, value) VALUES (?, 'now_playing_id', '')`,
     ).bind(id),
+    c.env.DB.prepare(
+      `INSERT INTO settings (channel_id, key, value) VALUES (?, 'allow_duplicate_requests', 'true')`,
+    ).bind(id),
   ]);
 
   const channel = await c.env.DB.prepare("SELECT id, slug, name, created_at FROM channels WHERE id = ?")

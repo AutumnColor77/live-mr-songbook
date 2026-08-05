@@ -25,6 +25,7 @@ export type SongRequest = {
 export type StatusResponse = {
   channel?: { slug: string; name: string };
   acceptingRequests: boolean;
+  allowDuplicateRequests?: boolean;
   nowPlaying: SongRequest | null;
   pendingCount: number;
 };

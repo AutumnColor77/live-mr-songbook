@@ -11,7 +11,8 @@ INSERT OR IGNORE INTO channels (id, slug, name, admin_token_hash, created_at) VA
 
 INSERT OR IGNORE INTO settings (channel_id, key, value) VALUES
   ('ch-demo', 'accepting_requests', 'true'),
-  ('ch-demo', 'now_playing_id', '');
+  ('ch-demo', 'now_playing_id', ''),
+  ('ch-demo', 'allow_duplicate_requests', 'true');
 
 INSERT OR IGNORE INTO songs (id, channel_id, title, artist, category, tags, song_key, bpm, enabled, created_at, updated_at) VALUES
   ('song-1', 'ch-demo', '사건의 지평선', '윤하', 'KPOP', '["MR","원키"]', 'A', 130, 1, 1722470400000, 1722470400000),

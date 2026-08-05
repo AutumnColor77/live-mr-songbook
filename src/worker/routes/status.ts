@@ -16,8 +16,14 @@ status.get("/", async (c) => {
   )
     .bind(channelId)
     .first<{ value: string }>();
+  const allowDupRow = await c.env.DB.prepare(
+    "SELECT value FROM settings WHERE channel_id = ? AND key = 'allow_duplicate_requests'",
+  )
+    .bind(channelId)
+    .first<{ value: string }>();
 
   const accepting = (acceptingRow?.value ?? "true") === "true";
+  const allowDuplicateRequests = (allowDupRow?.value ?? "true") === "true";
   const nowPlayingId = nowPlayingIdRow?.value ?? "";
 
   let nowPlaying = null;
@@ -51,6 +57,7 @@ status.get("/", async (c) => {
       name: c.get("channel").name,
     },
     acceptingRequests: accepting,
+    allowDuplicateRequests,
     nowPlaying,
     pendingCount: pending?.count ?? 0,
   });

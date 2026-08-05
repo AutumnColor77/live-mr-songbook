@@ -220,6 +220,14 @@ async function mountDashboard(
           <button id="accepting-toggle" type="button" class="primary-btn btn-sm">신청 마감하기</button>
         </section>
 
+        <section class="panel p-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p class="text-xs font-extrabold text-dim tracking-wide mb-1">중복 신청</p>
+            <p id="dup-label" class="text-sm font-bold text-main">…</p>
+          </div>
+          <button id="dup-toggle" type="button" class="secondary-btn btn-sm">중복 신청 차단</button>
+        </section>
+
         <section class="panel p-5">
           <div class="flex items-center gap-3">
             <span class="dock-art">${icons.disc(22)}</span>
@@ -288,6 +296,13 @@ async function mountDashboard(
     toggle.textContent = accepting ? "신청 마감하기" : "신청 다시 열기";
     toggle.classList.toggle("primary-btn", accepting);
     toggle.classList.toggle("secondary-btn", !accepting);
+
+    const allowDup = status?.allowDuplicateRequests !== false;
+    $("#dup-label").textContent = allowDup ? "중복 신청 허용" : "중복 신청 차단";
+    const dupToggle = $("#dup-toggle") as HTMLButtonElement;
+    dupToggle.textContent = allowDup ? "중복 신청 차단" : "중복 신청 허용";
+    dupToggle.classList.toggle("primary-btn", !allowDup);
+    dupToggle.classList.toggle("secondary-btn", allowDup);
 
     $("#admin-now-playing").textContent = nowPlayingLabel(status);
 
@@ -369,6 +384,25 @@ async function mountDashboard(
       const next = !status.acceptingRequests;
       await patchAdminSettings(slug, { acceptingRequests: next });
       showToast(next ? "신청을 열었습니다." : "신청을 마감했습니다.");
+      await refresh();
+    } catch (err) {
+      if (err instanceof AdminAuthError) {
+        mountLogin(root, slug, "세션이 만료되었습니다. 다시 로그인해 주세요.");
+        return;
+      }
+      showToast(err instanceof Error ? err.message : "설정 변경 실패");
+    } finally {
+      busy = false;
+    }
+  });
+
+  $("#dup-toggle").addEventListener("click", async () => {
+    if (busy || !status) return;
+    busy = true;
+    try {
+      const next = status.allowDuplicateRequests === false;
+      await patchAdminSettings(slug, { allowDuplicateRequests: next });
+      showToast(next ? "중복 신청을 허용합니다." : "중복 신청을 차단합니다.");
       await refresh();
     } catch (err) {
       if (err instanceof AdminAuthError) {

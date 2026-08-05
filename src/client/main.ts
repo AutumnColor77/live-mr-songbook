@@ -765,6 +765,38 @@ async function mountSongbook(slug: string) {
     return state.status?.acceptingRequests !== false;
   }
 
+  function allowsDuplicates(): boolean {
+    return state.status?.allowDuplicateRequests !== false;
+  }
+
+  function queuedSongIds(): Set<string> {
+    const ids = new Set<string>();
+    for (const q of state.queue) {
+      if (
+        (q.status === "pending" || q.status === "playing") &&
+        typeof q.songId === "string" &&
+        q.songId
+      ) {
+        ids.add(q.songId);
+      }
+    }
+    return ids;
+  }
+
+  function isSongRequestBlocked(songId: string, queued?: Set<string>): boolean {
+    if (!isAccepting()) return true;
+    if (!allowsDuplicates() && (queued ?? queuedSongIds()).has(songId)) return true;
+    return false;
+  }
+
+  function songRequestTitle(songId: string, queued?: Set<string>): string {
+    if (!isAccepting()) return "신청 마감";
+    if (!allowsDuplicates() && (queued ?? queuedSongIds()).has(songId)) {
+      return "이미 대기열에 있음";
+    }
+    return "신청하기";
+  }
+
   function nowPlayingLabel(): string {
     const np = state.status?.nowPlaying;
     return np ? `${np.title} - ${np.artist}` : "재생 중인 곡이 없습니다.";
@@ -896,9 +928,14 @@ async function mountSongbook(slug: string) {
 
     const accepting = isAccepting();
     const isButton = state.viewMode === "button";
+    const queued = queuedSongIds();
+    const blockDup = !allowsDuplicates();
 
     list.innerHTML = state.songs
       .map((song) => {
+        const inQueue = blockDup && queued.has(song.id);
+        const blocked = !accepting || inQueue;
+        const title = songRequestTitle(song.id, queued);
         const thumb = typeof song.thumbnail === "string" ? song.thumbnail.trim() : "";
         const thumbInner = thumb
           ? `<img src="${escapeHtml(thumb)}" alt="" loading="lazy" referrerpolicy="no-referrer" />`
@@ -929,11 +966,11 @@ async function mountSongbook(slug: string) {
         if (isButton) {
           return `
           <article
-            class="song-card button-row${accepting ? "" : " is-disabled"}"
+            class="song-card button-row${blocked ? " is-disabled" : ""}"
             data-song-id="${escapeHtml(song.id)}"
             role="button"
             tabindex="0"
-            title="${accepting ? "신청하기" : "신청 마감"}"
+            title="${title}"
           >
             <div class="thumbnail">${thumbInner}</div>
             <div class="song-info-content button-layout">
@@ -983,8 +1020,9 @@ async function mountSongbook(slug: string) {
                 type="button"
                 class="request-btn primary-btn btn-sm"
                 data-song-id="${escapeHtml(song.id)}"
-                ${accepting ? "" : "disabled"}
-              >${icons.mic(15)}신청</button>
+                title="${title}"
+                ${blocked ? "disabled" : ""}
+              >${icons.mic(15)}${inQueue ? "대기중" : "신청"}</button>
             </div>
           </article>`;
       })
@@ -1046,12 +1084,20 @@ async function mountSongbook(slug: string) {
     renderQueueItems($("#queue-list"), state.queue);
     renderQueueItems($("#aside-queue-list"), state.queue);
 
+    const queued = queuedSongIds();
     document.querySelectorAll<HTMLButtonElement>(".request-btn").forEach((btn) => {
-      btn.disabled = !accepting;
+      const songId = btn.dataset.songId ?? "";
+      const blocked = isSongRequestBlocked(songId, queued);
+      btn.disabled = blocked;
+      btn.title = songRequestTitle(songId, queued);
+      const inQueue = !allowsDuplicates() && queued.has(songId);
+      btn.innerHTML = `${icons.mic(15)}${inQueue ? "대기중" : "신청"}`;
     });
     document.querySelectorAll<HTMLElement>(".song-card.button-row").forEach((card) => {
-      card.classList.toggle("is-disabled", !accepting);
-      card.title = accepting ? "신청하기" : "신청 마감";
+      const songId = card.dataset.songId ?? "";
+      const blocked = isSongRequestBlocked(songId, queued);
+      card.classList.toggle("is-disabled", blocked);
+      card.title = songRequestTitle(songId, queued);
     });
   }
 
@@ -1060,6 +1106,10 @@ async function mountSongbook(slug: string) {
     if (!song) return;
     if (!isAccepting()) {
       showToast("지금은 신청을 받지 않습니다.");
+      return;
+    }
+    if (!allowsDuplicates() && queuedSongIds().has(song.id)) {
+      showToast("이미 대기열에 있는 곡입니다.");
       return;
     }
     state.selectedSong = song;
@@ -1207,11 +1257,14 @@ async function mountSongbook(slug: string) {
     }
     const card = (e.target as HTMLElement).closest<HTMLElement>(".song-card.button-row");
     if (!card) return;
-    if (card.classList.contains("is-disabled") || !isAccepting()) {
-      showToast("지금은 신청을 받지 않습니다.");
+    const songId = card.dataset.songId ?? "";
+    if (card.classList.contains("is-disabled") || isSongRequestBlocked(songId)) {
+      showToast(songRequestTitle(songId) === "이미 대기열에 있음"
+        ? "이미 대기열에 있는 곡입니다."
+        : "지금은 신청을 받지 않습니다.");
       return;
     }
-    openRequestModal(card.dataset.songId ?? "");
+    openRequestModal(songId);
   });
 
   $("#song-list").addEventListener("keydown", (e) => {

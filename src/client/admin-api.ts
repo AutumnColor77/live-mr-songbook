@@ -69,7 +69,11 @@ export async function clearQueue(slug: string): Promise<number> {
 
 export async function patchAdminSettings(
   slug: string,
-  body: { acceptingRequests?: boolean; nowPlayingId?: string | null },
+  body: {
+    acceptingRequests?: boolean;
+    allowDuplicateRequests?: boolean;
+    nowPlayingId?: string | null;
+  },
 ): Promise<void> {
   await adminFetch<{ ok: boolean }>(slug, "/settings", {
     method: "PATCH",
