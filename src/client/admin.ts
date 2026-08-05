@@ -25,6 +25,14 @@ import type { SongRequest, StatusResponse } from "./types";
 type Theme = "dark" | "light" | "pink" | "sky";
 const THEMES: Theme[] = ["dark", "light", "pink", "sky"];
 const THEME_STORAGE_KEY = "songbook-theme";
+let adminPollTimer: number | undefined;
+
+function stopAdminPolling() {
+  if (adminPollTimer !== undefined) {
+    window.clearInterval(adminPollTimer);
+    adminPollTimer = undefined;
+  }
+}
 
 function currentTheme(): Theme {
   const stored = localStorage.getItem(THEME_STORAGE_KEY);
@@ -33,6 +41,15 @@ function currentTheme(): Theme {
 
 function logoSrc(theme: Theme): string {
   return theme === "dark" ? "/logo-on-dark.webp" : "/logo-on-light.webp";
+}
+
+function logoLinkHtml(options?: { fetchpriority?: boolean }): string {
+  const fetchpriority = options?.fetchpriority
+    ? " fetchpriority=\"high\""
+    : "";
+  return `<a href="/" class="min-w-0 shrink-0 block">
+    <img id="logo-lockup" class="logo-lockup" src="${logoSrc(currentTheme())}" width="480" height="120" alt="Live MR Songbook 홈"${fetchpriority} />
+  </a>`;
 }
 
 function applyTheme(theme: Theme) {
@@ -97,11 +114,12 @@ function mountLogin(
     naverEnabled: true,
   },
 ): void {
+  stopAdminPolling();
   root.innerHTML = `
     <div class="relative z-10 min-h-screen flex flex-col">
       <header class="topbar sticky top-0 z-30">
         <div class="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
-          <img id="logo-lockup" class="logo-lockup" src="${logoSrc(currentTheme())}" width="480" height="120" alt="Live MR SongBook" />
+          ${logoLinkHtml()}
           <a href="/c/${escapeHtml(slug)}" class="secondary-btn btn-sm">노래책 보기</a>
         </div>
       </header>
@@ -159,12 +177,13 @@ async function mountDashboard(
   user: AuthUser,
   notice = "",
 ): Promise<void> {
+  stopAdminPolling();
   root.innerHTML = `
     <div class="relative z-10 min-h-screen flex flex-col">
       <header class="topbar sticky top-0 z-30">
         <div class="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
           <div class="flex items-center gap-3 min-w-0">
-            <img id="logo-lockup" class="logo-lockup" src="${logoSrc(currentTheme())}" width="480" height="120" alt="Live MR SongBook" />
+            ${logoLinkHtml()}
             <div class="min-w-0">
               <p id="admin-channel-name" class="text-sm font-extrabold text-main truncate">…</p>
               <p class="text-xs font-medium text-dim">운영</p>
@@ -332,6 +351,7 @@ async function mountDashboard(
   }
 
   $("#admin-logout").addEventListener("click", async () => {
+    stopAdminPolling();
     await logout();
     mountLogin(root, slug);
   });
@@ -409,5 +429,5 @@ async function mountDashboard(
   });
 
   await refresh();
-  window.setInterval(() => void refresh(), 4000);
+  adminPollTimer = window.setInterval(() => void refresh(), 4000);
 }

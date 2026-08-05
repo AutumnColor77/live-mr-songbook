@@ -56,6 +56,15 @@ function logoSrc(theme: Theme): string {
   return theme === "dark" ? "/logo-on-dark.webp" : "/logo-on-light.webp";
 }
 
+function logoLinkHtml(options?: { fetchpriority?: boolean }): string {
+  const fetchpriority = options?.fetchpriority
+    ? " fetchpriority=\"high\""
+    : "";
+  return `<a href="/" class="min-w-0 shrink-0 block">
+    <img id="logo-lockup" class="logo-lockup" src="${logoSrc(currentTheme())}" width="480" height="120" alt="Live MR Songbook 홈"${fetchpriority} />
+  </a>`;
+}
+
 function applyTheme(theme: Theme) {
   document.documentElement.dataset.theme = theme;
   localStorage.setItem(THEME_STORAGE_KEY, theme);
@@ -159,9 +168,7 @@ async function mountAccount(
     <div class="relative z-10 min-h-screen flex flex-col">
       <header class="topbar sticky top-0 z-30">
         <div class="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
-          <a href="/" class="min-w-0">
-            <img id="logo-lockup" class="logo-lockup" src="${logoSrc(currentTheme())}" width="480" height="120" alt="Live MR SongBook" />
-          </a>
+          ${logoLinkHtml()}
           <div class="flex items-center gap-2 shrink-0">
             <button id="theme-btn" type="button" class="icon-btn" title="테마 변경" aria-label="테마 변경">${icons.palette(18)}</button>
             <button id="logout-btn" type="button" class="secondary-btn btn-sm">로그아웃</button>
@@ -379,10 +386,7 @@ function mountLanding(
   }
 
   const authBlock = user
-    ? `
-      <a href="/me" class="primary-btn w-full">내 채널로</a>
-      <button id="logout-btn" type="button" class="secondary-btn w-full">로그아웃</button>
-    `
+    ? `<a href="/me" class="primary-btn w-full">내 채널로</a>`
     : `
       ${loginButtonHtml(providers, "내 채널 시작")}
       <p class="text-xs text-dim text-center leading-relaxed">
@@ -394,18 +398,17 @@ function mountLanding(
     <div class="relative z-10 min-h-screen flex flex-col">
       <header class="topbar sticky top-0 z-30">
         <div class="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
-          <img
-            id="logo-lockup"
-            class="logo-lockup"
-            src="${logoSrc(currentTheme())}"
-            width="480"
-            height="120"
-            alt="Live MR SongBook"
-            fetchpriority="high"
-          />
-          <button id="theme-btn" type="button" class="icon-btn" title="테마 변경" aria-label="테마 변경">
+          ${logoLinkHtml({ fetchpriority: true })}
+          <div class="flex items-center gap-2 shrink-0">
+            ${
+              user
+                ? `<button id="logout-btn" type="button" class="secondary-btn btn-sm">로그아웃</button>`
+                : ""
+            }
+            <button id="theme-btn" type="button" class="icon-btn" title="테마 변경" aria-label="테마 변경">
             ${icons.palette(18)}
           </button>
+          </div>
         </div>
       </header>
       <main class="flex-1 flex items-center justify-center px-4 py-12">
@@ -463,7 +466,7 @@ async function mountProfileSetup(root: HTMLElement, user: AuthUser): Promise<voi
     <div class="relative z-10 min-h-screen flex flex-col">
       <header class="topbar sticky top-0 z-30">
         <div class="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
-          <img id="logo-lockup" class="logo-lockup" src="${logoSrc(currentTheme())}" width="480" height="120" alt="Live MR SongBook" />
+          ${logoLinkHtml()}
         </div>
       </header>
       <main class="flex-1 flex items-center justify-center px-4 py-12">
@@ -580,15 +583,7 @@ async function mountSongbook(slug: string) {
     <header class="topbar sticky top-0 z-30">
       <div class="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
         <div class="flex items-center gap-3 min-w-0">
-          <img
-            id="logo-lockup"
-            class="logo-lockup"
-            src="${logoSrc(currentTheme())}"
-            width="480"
-            height="120"
-            alt="Live MR SongBook"
-            fetchpriority="high"
-          />
+          ${logoLinkHtml({ fetchpriority: true })}
           <div class="min-w-0">
             <p id="channel-name" class="text-sm font-extrabold text-main truncate">…</p>
           </div>
