@@ -47,10 +47,19 @@ function parseSocketIoPayload(raw: string): { event: string; data: unknown } | n
   }
 }
 
+function socketOpen(ws: WebSocket | null): boolean {
+  return Boolean(ws && ws.readyState === WebSocket.OPEN);
+}
+
+/**
+ * Outbound Chzzk Session socket.
+ * Hibernation (`ctx.acceptWebSocket`) only works for *incoming* sockets — use `ws.accept()` + listeners.
+ */
 export class ChzzkSessionDO extends DurableObject<Bindings> {
   private channelId = "";
   private sessionKey = "";
   private connecting = false;
+  private socket: WebSocket | null = null;
 
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
@@ -96,7 +105,7 @@ export class ChzzkSessionDO extends DurableObject<Bindings> {
       return Response.json({
         channelId: this.channelId || null,
         sessionKey: this.sessionKey || null,
-        sockets: this.ctx.getWebSockets().length,
+        sockets: socketOpen(this.socket) ? 1 : 0,
       });
     }
 
@@ -109,7 +118,7 @@ export class ChzzkSessionDO extends DurableObject<Bindings> {
     if (!this.channelId) return;
     try {
       await this.ensureFreshToken();
-      if (this.ctx.getWebSockets().length === 0) {
+      if (!socketOpen(this.socket)) {
         await this.startSession();
       } else {
         this.ctx.storage.setAlarm(Date.now() + 50 * 60 * 1000);
@@ -155,17 +164,39 @@ export class ChzzkSessionDO extends DurableObject<Bindings> {
     return tokens.accessToken;
   }
 
+  private closeSocket(reason: string) {
+    const ws = this.socket;
+    this.socket = null;
+    if (!ws) return;
+    try {
+      ws.close(1000, reason.slice(0, 120));
+    } catch {
+      /* ignore */
+    }
+  }
+
+  private bindSocket(ws: WebSocket) {
+    this.socket = ws;
+    ws.accept();
+
+    ws.addEventListener("message", (event) => {
+      void this.onSocketMessage(ws, event.data);
+    });
+    ws.addEventListener("close", () => {
+      if (this.socket === ws) this.socket = null;
+      void this.onSocketClose();
+    });
+    ws.addEventListener("error", () => {
+      if (this.socket === ws) this.socket = null;
+      void this.onSocketError();
+    });
+  }
+
   private async startSession(): Promise<void> {
     if (this.connecting) return;
     this.connecting = true;
     try {
-      for (const ws of this.ctx.getWebSockets()) {
-        try {
-          ws.close(1000, "restart");
-        } catch {
-          /* ignore */
-        }
-      }
+      this.closeSocket("restart");
       this.sessionKey = "";
       await this.setStatus("connecting", "");
       const token = await this.ensureFreshToken();
@@ -179,7 +210,7 @@ export class ChzzkSessionDO extends DurableObject<Bindings> {
       if (!ws) {
         throw new Error(`WebSocket upgrade failed (${res.status})`);
       }
-      this.ctx.acceptWebSocket(ws);
+      this.bindSocket(ws);
       this.ctx.storage.setAlarm(Date.now() + 50 * 60 * 1000);
     } finally {
       this.connecting = false;
@@ -187,19 +218,13 @@ export class ChzzkSessionDO extends DurableObject<Bindings> {
   }
 
   private async stopSession(reason: string) {
-    for (const ws of this.ctx.getWebSockets()) {
-      try {
-        ws.close(1000, reason);
-      } catch {
-        /* ignore */
-      }
-    }
+    this.closeSocket(reason);
     this.sessionKey = "";
     await this.setStatus("disconnected", reason);
     await this.ctx.storage.deleteAlarm();
   }
 
-  async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer) {
+  private async onSocketMessage(ws: WebSocket, message: string | ArrayBuffer) {
     this.channelId =
       (await this.ctx.storage.get<string>("channelId")) ?? this.channelId;
     const text =
@@ -240,7 +265,7 @@ export class ChzzkSessionDO extends DurableObject<Bindings> {
     }
   }
 
-  async webSocketClose() {
+  private async onSocketClose() {
     this.channelId =
       (await this.ctx.storage.get<string>("channelId")) ?? this.channelId;
     if (this.channelId) {
@@ -249,7 +274,7 @@ export class ChzzkSessionDO extends DurableObject<Bindings> {
     }
   }
 
-  async webSocketError() {
+  private async onSocketError() {
     this.channelId =
       (await this.ctx.storage.get<string>("channelId")) ?? this.channelId;
     if (this.channelId) {
