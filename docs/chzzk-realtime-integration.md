@@ -6,7 +6,7 @@
 
 | 항목 | 상태 |
 |------|------|
-| 명령 파서 · `POST .../chzzk/ingest` · request_mode/가격/prefix · 시청자 복붙 모달 | 완료 |
+| 명령 파서 · `POST .../chzzk/ingest` · 시청자 복붙 모달 | 완료 |
 | `channel_chzzk_links` · 치지직 OAuth(채널 연결) · 운영 UI | 코드 골격 완료 (시크릿·앱 등록 필요) |
 | `ChzzkSessionDO` (Session Socket · 도네/채팅 → ingest) | 코드 골격 완료 (실연동 검증 필요) |
 | 동명곡/하이픈 고도화 · ingest_events | 미착수 |
@@ -65,14 +65,14 @@ sequenceDiagram
 
 4. **E2E**  
    - 운영 → 치지직 연결(OAuth)  
-   - 모드·최소 후원 설정  
    - 실후원 → 대기열  
    - 채팅 `!신청 가수-제목` → 대기열  
    - 끊김·토큰 만료 후 재연결 확인
 
 5. **제품 규칙 (확정)**  
    - 연결 UI: 채널 운영 (`/c/:slug/admin`)  
-   - 매핑: Songbook 채널당 치지직 링크 1개
+   - 매핑: Songbook 채널당 치지직 링크 1개  
+   - 신청 기본: 웹+채팅+후원, 명령 `!신청 가수-제목` (채널별 설정 UI 없음)
 
 ## API 요약
 

@@ -74,36 +74,14 @@ export async function mountDashboard(
 
         <section class="panel p-4 space-y-3">
           <div>
-            <p class="text-xs font-extrabold text-dim tracking-wide mb-1">치지직 신청</p>
-            <p class="text-xs font-medium text-muted">채팅·후원 명령문 (!신청 가수-제목) 설정</p>
+            <p class="text-xs font-extrabold text-dim tracking-wide mb-1">치지직 실시간 연결</p>
+            <p class="text-xs font-medium text-muted">채팅·후원 신청을 받으려면 스트리머 치지직 계정을 연결하세요.</p>
           </div>
-          <div class="flex flex-wrap gap-3 items-end">
-            <label class="block min-w-[8rem]">
-              <span class="text-[11px] font-bold text-dim">모드</span>
-              <select id="request-mode" class="cm-input mt-1 text-sm">
-                <option value="both">웹+채팅+후원</option>
-                <option value="free">웹+채팅(무료)</option>
-                <option value="paid">후원만(유료)</option>
-              </select>
-            </label>
-            <label class="block min-w-[8rem] flex-1">
-              <span class="text-[11px] font-bold text-dim">최소 후원(원)</span>
-              <input id="request-price" type="number" min="0" max="100000000" step="100" class="cm-input mt-1 text-sm" placeholder="0" />
-            </label>
-            <label class="block min-w-[7rem]">
-              <span class="text-[11px] font-bold text-dim">명령 prefix</span>
-              <input id="request-prefix" type="text" maxlength="40" class="cm-input mt-1 text-sm" placeholder="!신청" />
-            </label>
-            <button id="request-settings-save" type="button" class="primary-btn btn-sm">저장</button>
-          </div>
-          <div class="pt-2 border-t border-glass-border space-y-2">
-            <p class="text-[11px] font-bold text-dim">치지직 실시간 연결</p>
-            <p id="chzzk-link-label" class="text-xs font-medium text-muted">불러오는 중…</p>
-            <div class="flex flex-wrap gap-2">
-              <a id="chzzk-connect" href="${chzzkConnectUrl(slug)}" class="primary-btn btn-sm">치지직 연결</a>
-              <button id="chzzk-session" type="button" class="secondary-btn btn-sm" hidden>세션 재시작</button>
-              <button id="chzzk-unlink" type="button" class="secondary-btn btn-sm" hidden>연결 해제</button>
-            </div>
+          <p id="chzzk-link-label" class="text-xs font-medium text-muted">불러오는 중…</p>
+          <div class="flex flex-wrap gap-2">
+            <a id="chzzk-connect" href="${chzzkConnectUrl(slug)}" class="primary-btn btn-sm">치지직 연결</a>
+            <button id="chzzk-session" type="button" class="secondary-btn btn-sm" hidden>세션 재시작</button>
+            <button id="chzzk-unlink" type="button" class="secondary-btn btn-sm" hidden>연결 해제</button>
           </div>
         </section>
 
@@ -193,12 +171,6 @@ export async function mountDashboard(
     toggle.textContent = accepting ? "신청 마감하기" : "신청 다시 열기";
     toggle.classList.toggle("primary-btn", accepting);
     toggle.classList.toggle("secondary-btn", !accepting);
-
-    const modeSelect = $("#request-mode") as unknown as HTMLSelectElement;
-    modeSelect.value = status?.requestMode ?? "both";
-    ($("#request-price") as HTMLInputElement).value = String(status?.requestPriceKrw ?? 0);
-    ($("#request-prefix") as HTMLInputElement).value =
-      status?.requestCommandPrefix ?? "!신청";
 
     const linkLabel = $("#chzzk-link-label");
     const connectBtn = $("#chzzk-connect") as HTMLAnchorElement;
@@ -350,43 +322,6 @@ export async function mountDashboard(
         return;
       }
       toast.show(err instanceof Error ? err.message : "설정 변경 실패");
-    } finally {
-      busy = false;
-    }
-  });
-
-  $("#request-settings-save").addEventListener("click", async () => {
-    if (busy) return;
-    busy = true;
-    try {
-      const mode = ($("#request-mode") as unknown as HTMLSelectElement).value;
-      const priceRaw = Number(($("#request-price") as HTMLInputElement).value);
-      const prefix = ($("#request-prefix") as HTMLInputElement).value.trim();
-      if (mode !== "free" && mode !== "paid" && mode !== "both") {
-        toast.show("신청 모드가 올바르지 않습니다.");
-        return;
-      }
-      if (!Number.isFinite(priceRaw) || priceRaw < 0) {
-        toast.show("최소 후원 금액을 확인해 주세요.");
-        return;
-      }
-      if (!prefix) {
-        toast.show("명령 prefix를 입력해 주세요.");
-        return;
-      }
-      await patchAdminSettings(slug, {
-        requestMode: mode,
-        requestPriceKrw: Math.round(priceRaw),
-        requestCommandPrefix: prefix,
-      });
-      toast.show("치지직 신청 설정을 저장했습니다.");
-      await refresh();
-    } catch (err) {
-      if (err instanceof AdminAuthError) {
-        mountLogin(root, slug, "세션이 만료되었습니다. 다시 로그인해 주세요.");
-        return;
-      }
-      toast.show(err instanceof Error ? err.message : "설정 저장 실패");
     } finally {
       busy = false;
     }

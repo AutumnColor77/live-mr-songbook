@@ -9,6 +9,7 @@ export type RequestCommandSettings = {
   separator: string;
 };
 
+/** Fixed product defaults — not user-configurable. */
 const DEFAULTS: RequestCommandSettings = {
   mode: "both",
   priceKrw: 0,
@@ -21,36 +22,10 @@ export function isRequestMode(raw: unknown): raw is RequestMode {
 }
 
 export async function loadRequestCommandSettings(
-  db: D1Database,
-  channelId: string,
+  _db: D1Database,
+  _channelId: string,
 ): Promise<RequestCommandSettings> {
-  const { results } = await db
-    .prepare(
-      `SELECT key, value FROM settings
-       WHERE channel_id = ? AND key IN (
-         'request_mode', 'request_price_krw',
-         'request_command_prefix', 'request_command_separator'
-       )`,
-    )
-    .bind(channelId)
-    .all<{ key: string; value: string }>();
-
-  const map = new Map((results ?? []).map((r) => [r.key, r.value]));
-  const modeRaw = map.get("request_mode");
-  const priceRaw = Number(map.get("request_price_krw") ?? DEFAULTS.priceKrw);
-  const prefix = (map.get("request_command_prefix") ?? DEFAULTS.prefix).trim() || DEFAULTS.prefix;
-  const separator =
-    (map.get("request_command_separator") ?? DEFAULTS.separator).trim() || DEFAULTS.separator;
-
-  return {
-    mode: isRequestMode(modeRaw) ? modeRaw : DEFAULTS.mode,
-    priceKrw:
-      Number.isFinite(priceRaw) && priceRaw >= 0
-        ? Math.min(Math.round(priceRaw), 100_000_000)
-        : 0,
-    prefix,
-    separator,
-  };
+  return { ...DEFAULTS };
 }
 
 export function seedRequestCommandSettings(
