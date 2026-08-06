@@ -83,6 +83,9 @@ export type RequestRow = {
   status: string;
   created_at: number;
   sort_order: number;
+  pay_amount?: number | null;
+  donation_ref?: string | null;
+  chat_message_ref?: string | null;
 };
 
 export type Song = {
@@ -138,6 +141,7 @@ export type SongRequest = {
   status: string;
   createdAt: number;
   sortOrder: number;
+  payAmount: number | null;
 };
 
 /** Suggested tip amount in KRW (0 clears / null keeps unset). Cap 100_000_000. */
@@ -186,6 +190,12 @@ export function mapSong(row: SongRow): Song {
 }
 
 export function mapRequest(row: RequestRow): SongRequest {
+  const pay =
+    typeof row.pay_amount === "number" &&
+    Number.isFinite(row.pay_amount) &&
+    row.pay_amount >= 0
+      ? Math.round(row.pay_amount)
+      : null;
   return {
     id: row.id,
     songId: row.song_id,
@@ -196,5 +206,6 @@ export function mapRequest(row: RequestRow): SongRequest {
     status: row.status,
     createdAt: row.created_at,
     sortOrder: typeof row.sort_order === "number" ? row.sort_order : row.created_at,
+    payAmount: pay,
   };
 }

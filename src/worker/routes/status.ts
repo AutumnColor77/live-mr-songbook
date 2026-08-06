@@ -3,6 +3,7 @@ import {
   loadBlockedSongIds,
   loadDuplicatePolicy,
 } from "../duplicate-policy";
+import { loadRequestCommandSettings } from "../request-settings";
 import { mapRequest, type AppEnv, type RequestRow } from "../types";
 
 const status = new Hono<AppEnv>();
@@ -30,6 +31,7 @@ status.get("/", async (c) => {
     policy,
     sessionStartedAt,
   );
+  const requestSettings = await loadRequestCommandSettings(c.env.DB, channelId);
 
   let nowPlaying = null;
   if (nowPlayingId) {
@@ -67,6 +69,10 @@ status.get("/", async (c) => {
     blockedSongIds,
     nowPlaying,
     pendingCount: pending?.count ?? 0,
+    requestMode: requestSettings.mode,
+    requestPriceKrw: requestSettings.priceKrw,
+    requestCommandPrefix: requestSettings.prefix,
+    requestCommandSeparator: requestSettings.separator,
   });
 });
 

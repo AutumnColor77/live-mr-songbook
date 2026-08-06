@@ -1,3 +1,5 @@
+import { seedRequestCommandSettings } from "./request-settings";
+
 /** Default settings rows inserted when a channel is created. */
 export function seedDefaultChannelSettings(
   db: D1Database,
@@ -25,6 +27,7 @@ export function seedDefaultChannelSettings(
         `INSERT INTO settings (channel_id, key, value) VALUES (?, 'duplicate_session_started_at', ?)`,
       )
       .bind(channelId, String(createdAt)),
+    ...seedRequestCommandSettings(db, channelId),
   ];
 }
 

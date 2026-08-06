@@ -6,6 +6,7 @@ import songs from "./routes/songs";
 import status from "./routes/status";
 import queue from "./routes/queue";
 import requests from "./routes/requests";
+import chzzk from "./routes/chzzk";
 import admin from "./routes/admin";
 import platform from "./routes/platform";
 import authRoutes from "./routes/auth";
@@ -36,6 +37,7 @@ channelApi.route("/songs", songs);
 channelApi.route("/status", status);
 channelApi.route("/queue", queue);
 channelApi.route("/requests", requests);
+channelApi.route("/chzzk", chzzk);
 channelApi.route("/admin", admin);
 
 app.route("/api/c/:slug", channelApi);

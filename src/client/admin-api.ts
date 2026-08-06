@@ -81,6 +81,10 @@ export async function patchAdminSettings(
     allowDuplicateRequests?: boolean;
     duplicatePolicy?: "allow" | "queue" | "played";
     nowPlayingId?: string | null;
+    requestMode?: "free" | "paid" | "both";
+    requestPriceKrw?: number;
+    requestCommandPrefix?: string;
+    requestCommandSeparator?: string;
   },
 ): Promise<void> {
   await adminFetch<{ ok: boolean }>(slug, "/settings", {

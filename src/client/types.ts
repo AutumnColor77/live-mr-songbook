@@ -22,9 +22,12 @@ export type SongRequest = {
   status: string;
   createdAt: number;
   sortOrder?: number;
+  payAmount?: number | null;
 };
 
 export type DuplicatePolicy = "allow" | "queue" | "played";
+
+export type RequestMode = "free" | "paid" | "both";
 
 export type StatusResponse = {
   channel?: { slug: string; name: string };
@@ -34,4 +37,8 @@ export type StatusResponse = {
   blockedSongIds?: string[];
   nowPlaying: SongRequest | null;
   pendingCount: number;
+  requestMode?: RequestMode;
+  requestPriceKrw?: number;
+  requestCommandPrefix?: string;
+  requestCommandSeparator?: string;
 };

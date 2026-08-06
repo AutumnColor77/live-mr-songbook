@@ -19,6 +19,10 @@ export function renderQueueItems(container: HTMLElement, items: SongRequest[]) {
     .map((item, index) => {
       const playing =
         item.status === "playing" ? `<span class="status-badge playing">재생중</span>` : "";
+      const pay =
+        typeof item.payAmount === "number" && item.payAmount > 0
+          ? `<span class="status-badge">${escapeHtml(item.payAmount.toLocaleString("ko-KR"))}원</span>`
+          : "";
       const comment = item.comment
         ? `<p class="text-[11px] font-medium text-dim truncate mt-0.5">${escapeHtml(item.comment)}</p>`
         : "";
@@ -26,9 +30,10 @@ export function renderQueueItems(container: HTMLElement, items: SongRequest[]) {
         <div class="queue-row">
           <span class="queue-index">${index + 1}</span>
           <div class="min-w-0 flex-1">
-            <div class="flex items-center gap-2 min-w-0">
+            <div class="flex items-center gap-2 min-w-0 flex-wrap">
               <p class="song-name text-sm">${escapeHtml(item.title)}</p>
               ${playing}
+              ${pay}
             </div>
             <p class="song-artist text-xs">${escapeHtml(item.artist)} · ${escapeHtml(item.nickname)}</p>
             ${comment}

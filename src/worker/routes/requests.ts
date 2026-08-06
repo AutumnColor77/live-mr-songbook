@@ -4,12 +4,25 @@ import {
   loadDuplicatePolicy,
 } from "../duplicate-policy";
 import { newId } from "../id";
+import { loadRequestCommandSettings } from "../request-settings";
 import { mapRequest, type AppEnv, type RequestRow, type SongRow } from "../types";
 
 const requests = new Hono<AppEnv>();
 
 requests.post("/", async (c) => {
   const channelId = c.get("channel").id;
+
+  const requestSettings = await loadRequestCommandSettings(c.env.DB, channelId);
+  if (requestSettings.mode === "paid") {
+    return c.json(
+      {
+        error:
+          "이 채널은 치지직 후원으로만 신청할 수 있습니다. 명령문을 복사해 후원 메시지에 붙여 넣으세요.",
+        requestMode: "paid",
+      },
+      403,
+    );
+  }
 
   const accepting = await c.env.DB.prepare(
     "SELECT value FROM settings WHERE channel_id = ? AND key = 'accepting_requests'",

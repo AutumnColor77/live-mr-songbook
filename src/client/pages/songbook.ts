@@ -29,6 +29,7 @@ import { updateStatusUI } from "../songbook/queue-ui";
 import { createRequestGate } from "../songbook/request-gate";
 import {
   closeRequestModal,
+  copyRequestCommand,
   handleSubmitRequest,
   openRequestModal,
 } from "../songbook/request-modal";
@@ -248,6 +249,7 @@ export async function mountSongbook(
 
   $("#close-request-modal").addEventListener("click", () => closeRequestModal(state));
   $("#request-modal-overlay").addEventListener("click", () => closeRequestModal(state));
+  $("#copy-request-cmd").addEventListener("click", () => void copyRequestCommand(toast));
   $("#submit-request-btn").addEventListener("click", () =>
     void handleSubmitRequest(state, toast, refreshQueueAndStatus),
   );
