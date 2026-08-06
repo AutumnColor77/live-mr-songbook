@@ -51,7 +51,7 @@ sequenceDiagram
    - Client ID / Secret  
    - Redirect URI  
      - 로컬: `http://localhost:5173/api/auth/chzzk/callback`  
-     - 프로덕션: `https://<your-worker>.workers.dev/api/auth/chzzk/callback`  
+     - 프로덕션: `https://livemrsongbook.com/api/auth/chzzk/callback`  
    - Scope: **유저 정보 조회**, **채팅 메시지 조회**, **후원 조회** ([Session](https://chzzk.gitbook.io/chzzk/chzzk-api/session) · [User](https://chzzk.gitbook.io/chzzk/chzzk-api/user))
 
 2. **시크릿 설정** (채팅에 Secret 붙이지 말 것)  

@@ -2,20 +2,20 @@ PLATFORM_ADMIN_TOKEN=dev-platform-token
 
 # Google OAuth (https://console.cloud.google.com/apis/credentials)
 # Redirect URI (local): http://localhost:5173/api/auth/google/callback
-# Redirect URI (prod):  https://<your-worker>.workers.dev/api/auth/google/callback
+# Redirect URI (prod):  https://livemrsongbook.com/api/auth/google/callback
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
 
 # Naver OAuth (https://developers.naver.com/apps)
 # Callback URL (local): http://localhost:5173/api/auth/naver/callback
-# Callback URL (prod):  https://<your-worker>.workers.dev/api/auth/naver/callback
+# Callback URL (prod):  https://livemrsongbook.com/api/auth/naver/callback
 # 앱 설정에서 이메일 등 필수 제공 정보 허용
 NAVER_CLIENT_ID=
 NAVER_CLIENT_SECRET=
 
 # Chzzk Open API (https://developers.chzzk.naver.com/)
 # Redirect URI (local): http://localhost:5173/api/auth/chzzk/callback
-# Redirect URI (prod):  https://<your-worker>.workers.dev/api/auth/chzzk/callback
+# Redirect URI (prod):  https://livemrsongbook.com/api/auth/chzzk/callback
 # Scopes: 유저 정보 조회, 채팅 메시지 조회, 후원 조회
 # See docs/chzzk-realtime-integration.md
 CHZZK_CLIENT_ID=

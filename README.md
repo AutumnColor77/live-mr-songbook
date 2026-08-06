@@ -10,7 +10,7 @@ Live MR Manager와는 **별도 리포**입니다. 스트리머는 소셜 로그�
 
 | 항목 | 값 |
 |------|-----|
-| URL | https://live-mr-songbook.boohun2771.workers.dev |
+| URL | https://livemrsongbook.com |
 | D1 | `live-mr-songbook` (`e2842118-6029-41bc-b309-f8e0a1b8bed1`) |
 
 시크릿은 Cloudflare Secret으로만 보관합니다 (`wrangler secret put …`).  
@@ -54,7 +54,8 @@ npm run dev          # http://localhost:5173
 1. 각 콘솔에서 웹 클라이언트 생성 후 콜백 URI 등록  
    - 로컬 Google: `http://localhost:5173/api/auth/google/callback`  
    - 로컬 Naver: `http://localhost:5173/api/auth/naver/callback`  
-   - 프로덕션: `https://live-mr-songbook.boohun2771.workers.dev/api/auth/{google|naver}/callback`
+   - 프로덕션: `https://livemrsongbook.com/api/auth/{google|naver}/callback`  
+     (기존 workers.dev 콜백도 유지 가능)
 2. `.dev.vars`에 클라이언트 ID/Secret 입력 (네이버는 이메일 등 필수 제공 허용)
 3. 프로덕션 시크릿:
 
@@ -80,7 +81,7 @@ npx wrangler secret put CHZZK_CLIENT_SECRET
 
 1. [개발자 센터](https://developers.chzzk.naver.com/) 앱 등록 · Scope(유저/채팅/후원) · Redirect URI  
    - 로컬: `http://localhost:5173/api/auth/chzzk/callback`  
-   - 프로덕션: `https://<worker>.workers.dev/api/auth/chzzk/callback`
+   - 프로덕션: `https://livemrsongbook.com/api/auth/chzzk/callback`
 2. `.dev.vars` / Workers secrets에 `CHZZK_CLIENT_ID` · `CHZZK_CLIENT_SECRET`
 3. `/me`에서 **치지직 연결** (한 번 연결 후 세션 유지)  
 4. `npm run db:migrate:remote` (또는 `deploy:with-migrate`)로 `0015`·`0016` 적용
