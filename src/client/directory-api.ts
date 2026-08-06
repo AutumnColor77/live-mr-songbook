@@ -2,7 +2,8 @@ export type DirectoryChannel = {
   slug: string;
   name: string;
   songCount: number;
-  isDemo: boolean;
+  picture: string;
+  ownerName: string;
 };
 
 export async function fetchDirectoryChannels(
@@ -22,5 +23,11 @@ export async function fetchDirectoryChannels(
     throw new Error(`Directory request failed (${res.status})`);
   }
   const data = (await res.json()) as { channels?: DirectoryChannel[] };
-  return data.channels ?? [];
+  return (data.channels ?? []).map((ch) => ({
+    slug: ch.slug,
+    name: ch.name,
+    songCount: Number(ch.songCount) || 0,
+    picture: ch.picture ?? "",
+    ownerName: ch.ownerName ?? "",
+  }));
 }

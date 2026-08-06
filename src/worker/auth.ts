@@ -22,29 +22,12 @@ export async function loadChannel(c: Context<AppEnv>, next: Next) {
   await next();
 }
 
-/** Demo channel: any signed-in Google user gets admin membership. */
+/** Demo channel removed; kept as no-op for any leftover callers. */
 export async function ensureDemoMembership(
-  db: D1Database,
-  userId: string,
+  _db: D1Database,
+  _userId: string,
 ): Promise<void> {
-  const demo = await db
-    .prepare("SELECT id FROM channels WHERE slug = 'demo'")
-    .first<{ id: string }>();
-  if (!demo) return;
-
-  const existing = await db
-    .prepare("SELECT user_id FROM channel_members WHERE channel_id = ? AND user_id = ?")
-    .bind(demo.id, userId)
-    .first();
-  if (existing) return;
-
-  await db
-    .prepare(
-      `INSERT INTO channel_members (channel_id, user_id, role, created_at)
-       VALUES (?, ?, 'admin', ?)`,
-    )
-    .bind(demo.id, userId, Date.now())
-    .run();
+  return;
 }
 
 async function userCanAdminChannel(
@@ -52,11 +35,6 @@ async function userCanAdminChannel(
   channel: ChannelRow,
   userId: string,
 ): Promise<boolean> {
-  if (channel.slug === "demo") {
-    await ensureDemoMembership(db, userId);
-    return true;
-  }
-
   const member = await db
     .prepare("SELECT user_id FROM channel_members WHERE channel_id = ? AND user_id = ?")
     .bind(channel.id, userId)

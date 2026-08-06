@@ -11,15 +11,10 @@ Live MR Manager와는 **별도 리포**입니다. 스트리머는 소셜 로그�
 | 항목 | 값 |
 |------|-----|
 | URL | https://live-mr-songbook.boohun2771.workers.dev |
-| 데모 노래책 | https://live-mr-songbook.boohun2771.workers.dev/c/demo |
-| 데모 운영 | https://live-mr-songbook.boohun2771.workers.dev/c/demo/admin |
 | D1 | `live-mr-songbook` (`e2842118-6029-41bc-b309-f8e0a1b8bed1`) |
 
 시크릿은 Cloudflare Secret으로만 보관합니다 (`wrangler secret put …`).  
 채널 **운영 권한의 기본**은 OAuth 세션 + `channel_members`입니다. 채널 Admin Token은 API 폴백·플랫폼 생성용입니다.
-
-데모 채널 시드 토큰(로컬/시드와 동일 해시): `demo-channel-token`  
-(데모 운영 화면에서 토큰 입력이 남아 있는 경우 위 값을 사용합니다.)
 
 ## Stack
 
@@ -35,14 +30,24 @@ Live MR Manager와는 **별도 리포**입니다. 스트리머는 소셜 로그�
 ```bash
 npm install
 cp .dev.vars.example .dev.vars   # PLATFORM_ADMIN_TOKEN + Google/Naver OAuth
-npm run db:migrate:local
+npm run db:pull                  # 프로덕션 D1 → 로컬 복사 (권장)
+# 또는 빈 로컬 DB: npm run db:migrate:local
 npm run dev
 ```
 
-- 홈: http://localhost:5173/
+프로덕션 DB를 로컬에서 쓰려면 Cloudflare에 로그인된 상태에서:
+
+```bash
+npx wrangler login   # 한 번
+npm run db:pull      # 원격 export → 로컬 import (프로덕션은 변경 없음)
+npm run dev          # http://localhost:5173
+```
+
+`tmp/remote-dump.sql`은 gitignore됩니다. UI/코드 확인은 `npm run dev`로 하고, 배포할 때만 커밋·푸시하면 됩니다.
+
+- 홈(노래책 디렉터리): http://localhost:5173/
 - 계정·채널: http://localhost:5173/me
-- 데모 시청자: http://localhost:5173/c/demo
-- 데모 운영: http://localhost:5173/c/demo/admin
+- 채널 예: http://localhost:5173/c/{slug} · 운영: http://localhost:5173/c/{slug}/admin
 
 ## OAuth (Google / Naver)
 
@@ -69,13 +74,13 @@ npx wrangler secret put NAVER_CLIENT_SECRET
 ## Multi-tenant model
 
 - **channels** — `slug`, `name`, `admin_token_hash`
-- **channel_members** — 사용자↔채널 역할(`admin` 등). 로그인 사용자는 **본인 채널 1개**(demo 제외)
+- **channel_members** — 사용자↔채널 역할(`admin` 등). 로그인 사용자는 **본인 채널 1개**
 - **songs** — `title`, `artist`, `category`(큐레이션), `genre`, `tags`, `song_key`, `bpm`, `difficulty`(1–5), `thumbnail`(http(s) 또는 압축 data URL), `enabled`
 - **requests / settings** — 채널 스코프 대기열·신청 수락·Now Playing
 - **users / sessions** — Google/Naver 계정, HttpOnly `sb_session` 쿠키
-- 시청자: 로그인 없음  
-- 스트리머: 소셜 로그인 → 프로필 설정(`/me/setup`) → **`/me`**에서 채널 생성·이름/슬러그 수정 → `/c/:slug/admin` 운영  
-- 로그인 성공 기본 next: `/me` (데모는 보조 CTA)
+- 시청자: 홈 디렉터리에서 노래책 탐색·선택 로그인  
+- 스트리머: 소셜 로그인 → **`/me`**에서 채널 생성·이름/슬러그 수정 → `/c/:slug/admin` 운영  
+- 로그인 성공 기본 next: `/me` (시청자 CTA는 `/`)
 
 ## API
 
@@ -145,7 +150,7 @@ npx wrangler secret put NAVER_CLIENT_SECRET
 
 Manager 앱에서 Songbook에 로그인한 뒤 라이브러리를 채널로 **Push**합니다.
 
-- 본인 채널만 대상(demo 차단). 없으면 `/api/me/channels`로 생성 유도
+- 본인 채널만 대상. 없으면 `/api/me/channels`로 생성 유도
 - 곡 메타: 제목·아티스트·장르·카테고리·태그·키·BPM·난이도·후원금액·썸네일
 - 썸네일: `http(s)` URL 유지, 로컬 이미지는 JPEG data URL로 압축 업로드
 - 기존 곡은 title+artist 키로 PATCH

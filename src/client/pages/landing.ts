@@ -13,33 +13,42 @@ import {
 import { applyTheme, currentTheme, cycleTheme, logoLinkHtml } from "../theme";
 import { createToast } from "../toast";
 
-function channelRowHtml(ch: DirectoryChannel): string {
-  const badge = ch.isDemo
-    ? `<span class="count-badge" style="background:var(--accent);color:#fff">체험</span>`
-    : "";
+function channelCardHtml(ch: DirectoryChannel): string {
+  const initial = escapeHtml(
+    (ch.ownerName || ch.name || "?").trim().slice(0, 1).toUpperCase() || "?",
+  );
+  const photo = ch.picture
+    ? `<img
+         src="${escapeHtml(ch.picture)}"
+         alt=""
+         class="absolute inset-0 w-full h-full object-cover"
+         referrerpolicy="no-referrer"
+         loading="lazy"
+       />`
+    : `<span class="absolute inset-0 flex items-center justify-center text-3xl font-extrabold text-main bg-[var(--surface-3)]">${initial}</span>`;
+
   return `
     <a
       href="/c/${escapeHtml(ch.slug)}"
-      class="flex items-center justify-between gap-3 rounded-xl border border-glass-border bg-[var(--surface-2)] px-3 py-3 hover:bg-[var(--surface-3)] transition-colors text-left"
+      class="directory-card group flex flex-col flex-[1_1_140px] w-full max-w-[200px] rounded-2xl border border-glass-border bg-[var(--surface-2)] overflow-hidden hover:border-[var(--accent)] transition-colors text-left"
     >
-      <div class="min-w-0 space-y-0.5">
-        <p class="text-sm font-extrabold text-main truncate flex items-center gap-2">
-          ${escapeHtml(ch.name)}
-          ${badge}
-        </p>
-        <p class="text-xs text-dim truncate">/c/${escapeHtml(ch.slug)}</p>
+      <div class="relative aspect-square w-full max-h-[200px] overflow-hidden bg-[var(--surface-3)]">
+        ${photo}
       </div>
-      <span class="text-xs font-semibold text-dim shrink-0">${ch.songCount}곡</span>
+      <div class="p-2.5 space-y-0.5 min-w-0">
+        <p class="text-sm font-extrabold text-main truncate">${escapeHtml(ch.name)}</p>
+        <p class="text-xs text-dim truncate">${ch.songCount}곡 · /c/${escapeHtml(ch.slug)}</p>
+      </div>
     </a>
   `;
 }
 
 function renderChannelList(listEl: HTMLElement, channels: DirectoryChannel[]) {
   if (channels.length === 0) {
-    listEl.innerHTML = `<p class="text-sm text-dim text-center py-6">맞는 노래책이 없습니다.</p>`;
+    listEl.innerHTML = `<p class="text-sm text-dim text-center py-6 w-full">맞는 노래책이 없습니다.</p>`;
     return;
   }
-  listEl.innerHTML = channels.map(channelRowHtml).join("");
+  listEl.innerHTML = channels.map(channelCardHtml).join("");
 }
 
 export function mountLanding(
@@ -97,7 +106,7 @@ export function mountLanding(
           </div>
         </div>
       </header>
-      <main class="flex-1 w-full max-w-2xl mx-auto px-4 sm:px-6 py-10 space-y-8">
+      <main class="flex-1 w-full max-w-3xl mx-auto px-4 sm:px-6 py-10 space-y-8">
         <section class="panel p-8 text-center space-y-5">
           <div>
             <h1 class="text-xl font-extrabold text-main mb-2">Live MR Songbook</h1>
@@ -131,8 +140,8 @@ export function mountLanding(
               placeholder="이름 또는 주소 검색..."
             />
           </div>
-          <div id="directory-list" class="space-y-2">
-            <p class="text-sm text-dim text-center py-6">불러오는 중…</p>
+          <div id="directory-list" class="flex flex-wrap gap-3 justify-start">
+            <p class="text-sm text-dim text-center py-6 w-full">불러오는 중…</p>
           </div>
         </section>
       </main>
@@ -175,7 +184,7 @@ export function mountLanding(
     } catch (err) {
       console.error(err);
       if (latestQuery !== q) return;
-      listEl.innerHTML = `<p class="text-sm text-center py-6" style="color:#f87171">목록을 불러오지 못했습니다.</p>`;
+      listEl.innerHTML = `<p class="text-sm text-center py-6 w-full" style="color:#f87171">목록을 불러오지 못했습니다.</p>`;
       countEl.textContent = "";
     }
   }

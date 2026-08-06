@@ -213,9 +213,9 @@ export async function exchangeOAuthCode(
 }
 
 /** Resize/compress image file to a small JPEG data URL for profile storage. */
-const PROFILE_IMAGE_MAX_SIDE = 125;
-/** Max stored data-URL length (~125KB text). */
-const PROFILE_IMAGE_MAX_DATA_URL_CHARS = 125_000;
+const PROFILE_IMAGE_MAX_SIDE = 200;
+/** Max stored data-URL length (~200KB text). */
+const PROFILE_IMAGE_MAX_DATA_URL_CHARS = 200_000;
 
 export async function fileToProfileDataUrl(file: File): Promise<string> {
   if (!file.type.startsWith("image/")) {

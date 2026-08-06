@@ -7,6 +7,8 @@ type DirectoryRow = {
   slug: string;
   name: string;
   song_count: number;
+  picture: string | null;
+  owner_name: string | null;
 };
 
 /** Public channel directory for the viewer home page. No auth. */
@@ -18,15 +20,30 @@ directory.get("/channels", async (c) => {
     SELECT
       c.slug AS slug,
       c.name AS name,
-      COALESCE(COUNT(s.id), 0) AS song_count
+      COALESCE(COUNT(s.id), 0) AS song_count,
+      (
+        SELECT u.picture
+        FROM channel_members cm
+        JOIN users u ON u.id = cm.user_id
+        WHERE cm.channel_id = c.id AND cm.role = 'admin'
+        ORDER BY cm.created_at ASC
+        LIMIT 1
+      ) AS picture,
+      (
+        SELECT u.name
+        FROM channel_members cm
+        JOIN users u ON u.id = cm.user_id
+        WHERE cm.channel_id = c.id AND cm.role = 'admin'
+        ORDER BY cm.created_at ASC
+        LIMIT 1
+      ) AS owner_name
     FROM channels c
     LEFT JOIN songs s
       ON s.channel_id = c.id AND s.enabled = 1
-    ${q ? "WHERE (c.name LIKE ? OR c.slug LIKE ?)" : ""}
+    WHERE c.slug != 'demo'
+      ${q ? "AND (c.name LIKE ? OR c.slug LIKE ?)" : ""}
     GROUP BY c.id
-    ORDER BY
-      CASE WHEN c.slug = 'demo' THEN 0 ELSE 1 END,
-      c.name COLLATE NOCASE ASC
+    ORDER BY c.name COLLATE NOCASE ASC
   `;
 
   const stmt = q
@@ -40,7 +57,8 @@ directory.get("/channels", async (c) => {
       slug: row.slug,
       name: row.name,
       songCount: Number(row.song_count) || 0,
-      isDemo: row.slug === "demo",
+      picture: row.picture?.trim() || "",
+      ownerName: row.owner_name?.trim() || "",
     })),
   });
 });

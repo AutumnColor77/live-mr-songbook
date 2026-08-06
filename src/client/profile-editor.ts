@@ -15,7 +15,7 @@ export function profileEditorFieldsHtml(user: AuthUser): string {
         사진 변경
         <input id="profile-picture-file" type="file" accept="image/*" class="sr-only" />
       </label>
-      <p class="text-xs text-dim">정사각 권장 · 자동으로 125×125 이하로 줄입니다</p>
+      <p class="text-xs text-dim">정사각 권장 · 자동으로 200×200 이하로 줄입니다</p>
     </div>
     <label class="block text-left space-y-1.5">
       <span class="text-xs font-extrabold text-dim tracking-wide">닉네임</span>

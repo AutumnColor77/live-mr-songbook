@@ -1,6 +1,8 @@
 node_modules
 dist
 .wrangler
+.tmp
+tmp
 .dev.vars
 .dev.vars.local
 .platform-token.tmp

@@ -204,7 +204,6 @@ async function finishOAuthLogin(
 
     const sessionToken = await createSession(c, user.id);
 
-    // Demo admin membership is granted lazily when accessing /c/demo/admin.
     const needsSetup = !user.profile_setup_done;
     const setupPath = `/me/setup?next=${encodeURIComponent(nextPath)}${
       client === "desktop" ? "&client=desktop" : ""
