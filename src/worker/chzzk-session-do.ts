@@ -29,6 +29,16 @@ function toEngineIoWsUrl(sessionUrl: string): string {
   return `${proto}//${u.host}/socket.io/?${q.toString()}`;
 }
 
+/** Chzzk wraps Socket.IO event args as a JSON string (double-encoded). */
+function unwrapEventData(data: unknown): unknown {
+  if (typeof data !== "string") return data;
+  try {
+    return JSON.parse(data);
+  } catch {
+    return data;
+  }
+}
+
 function parseSocketIoPayload(raw: string): { event: string; data: unknown } | null {
   const idx = raw.indexOf("42");
   if (idx < 0) return null;
@@ -41,7 +51,7 @@ function parseSocketIoPayload(raw: string): { event: string; data: unknown } | n
   try {
     const arr = JSON.parse(jsonPart) as unknown;
     if (!Array.isArray(arr) || arr.length < 1) return null;
-    return { event: String(arr[0]), data: arr[1] };
+    return { event: String(arr[0]), data: unwrapEventData(arr[1]) };
   } catch {
     return null;
   }
@@ -60,6 +70,7 @@ export class ChzzkSessionDO extends DurableObject<Bindings> {
   private sessionKey = "";
   private connecting = false;
   private socket: WebSocket | null = null;
+  private pingTimer: ReturnType<typeof setInterval> | null = null;
 
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
@@ -164,7 +175,32 @@ export class ChzzkSessionDO extends DurableObject<Bindings> {
     return tokens.accessToken;
   }
 
+  private clearPing() {
+    if (this.pingTimer) {
+      clearInterval(this.pingTimer);
+      this.pingTimer = null;
+    }
+  }
+
+  private startPing(ws: WebSocket, intervalMs: number) {
+    this.clearPing();
+    const ms = Math.max(5_000, intervalMs || 25_000);
+    this.pingTimer = setInterval(() => {
+      if (ws.readyState !== WebSocket.OPEN) {
+        this.clearPing();
+        return;
+      }
+      try {
+        // Engine.IO v3: client sends ping ("2"), server replies pong ("3")
+        ws.send("2");
+      } catch {
+        this.clearPing();
+      }
+    }, ms);
+  }
+
   private closeSocket(reason: string) {
+    this.clearPing();
     const ws = this.socket;
     this.socket = null;
     if (!ws) return;
@@ -184,10 +220,12 @@ export class ChzzkSessionDO extends DurableObject<Bindings> {
     });
     ws.addEventListener("close", () => {
       if (this.socket === ws) this.socket = null;
+      this.clearPing();
       void this.onSocketClose();
     });
     ws.addEventListener("error", () => {
       if (this.socket === ws) this.socket = null;
+      this.clearPing();
       void this.onSocketError();
     });
   }
@@ -231,27 +269,30 @@ export class ChzzkSessionDO extends DurableObject<Bindings> {
       typeof message === "string" ? message : new TextDecoder().decode(message);
     if (!text) return;
 
+    // Engine.IO open — do NOT send Socket.IO CONNECT ("40") on root `/`
+    // (Chzzk treats that as an unauthenticated reconnect and may auth-fail).
     if (text.startsWith("0")) {
       try {
-        ws.send("40");
+        const handshake = JSON.parse(text.slice(1)) as { pingInterval?: number };
+        this.startPing(ws, handshake.pingInterval ?? 25_000);
       } catch {
-        /* ignore */
+        this.startPing(ws, 25_000);
       }
       return;
     }
 
-    if (text === "2") {
-      try {
-        ws.send("3");
-      } catch {
-        /* ignore */
-      }
-      return;
-    }
+    // Engine.IO pong (reply to our ping) — ignore
+    if (text === "3") return;
 
     const parsed = parseSocketIoPayload(text);
     if (!parsed) return;
 
+    if (parsed.event === "error") {
+      const detail =
+        typeof parsed.data === "string" ? parsed.data : JSON.stringify(parsed.data);
+      await this.setStatus("error", detail.slice(0, 200));
+      return;
+    }
     if (parsed.event === "SYSTEM") {
       await this.onSystem(parsed.data);
       return;
