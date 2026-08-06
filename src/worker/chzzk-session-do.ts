@@ -323,10 +323,12 @@ export class ChzzkSessionDO extends DurableObject<Bindings> {
       text = message;
     } else if (message instanceof ArrayBuffer) {
       text = new TextDecoder().decode(message);
+    } else if (ArrayBuffer.isView(message)) {
+      text = new TextDecoder().decode(message);
     } else if (typeof Blob !== "undefined" && message instanceof Blob) {
       text = await message.text();
     } else {
-      text = new TextDecoder().decode(new Uint8Array(message as ArrayBufferLike));
+      text = String(message);
     }
     if (!text) return;
 
