@@ -78,7 +78,7 @@ export function renderSongs(state: SongbookState, gate: RequestGate) {
         .join("");
       const hasGenreCol = Boolean(mrBadge || genreBadge);
       const hasTagsCol = otherTags.length > 0;
-      const mobileMeta = [mrBadge, genreBadge, donationBadge].filter(Boolean).join("");
+      const mobileMeta = [mrBadge, genreBadge].filter(Boolean).join("");
 
       if (isButton) {
         return `
