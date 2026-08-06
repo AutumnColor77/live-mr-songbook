@@ -13,12 +13,19 @@ import { ingestChzzkRequest } from "./request-ingest";
 import type { Bindings } from "./types";
 
 /**
- * Convert Chzzk session URL to Engine.IO websocket upgrade URL (Socket.IO 2.x / EIO3).
- * Workers fetch() requires http(s):// even for Upgrade: websocket — runtime maps to ws(s).
+ * Convert Chzzk session URL to Engine.IO websocket URL (Socket.IO 2.x / EIO3).
+ * `new WebSocket()` wants ws(s)://; fetch Upgrade wants http(s)://.
  */
-function toEngineIoWsUrl(sessionUrl: string): string {
+function toEngineIoUrl(sessionUrl: string, forFetchUpgrade: boolean): string {
   const u = new URL(sessionUrl);
-  const proto = u.protocol === "http:" ? "http:" : "https:";
+  const secure = u.protocol !== "http:" && u.protocol !== "ws:";
+  const proto = forFetchUpgrade
+    ? secure
+      ? "https:"
+      : "http:"
+    : secure
+      ? "wss:"
+      : "ws:";
   const q = new URLSearchParams({
     EIO: "3",
     transport: "websocket",
@@ -128,6 +135,23 @@ export class ChzzkSessionDO extends DurableObject<Bindings> {
       (await this.ctx.storage.get<string>("channelId")) ?? this.channelId;
     if (!this.channelId) return;
     try {
+      const link = await getChzzkLink(this.env.DB, this.channelId);
+      // Stuck after WS upgrade but before SYSTEM connected
+      if (link?.session_status === "connecting") {
+        if (!socketOpen(this.socket)) {
+          await this.setStatus("error", "socket closed while connecting");
+          await this.startSession();
+          return;
+        }
+        await this.setStatus(
+          "error",
+          "no SYSTEM connected (check scopes / socket packets)",
+        );
+        this.closeSocket("connect timeout");
+        this.ctx.storage.setAlarm(Date.now() + 15_000);
+        return;
+      }
+
       await this.ensureFreshToken();
       if (!socketOpen(this.socket)) {
         await this.startSession();
@@ -211,12 +235,11 @@ export class ChzzkSessionDO extends DurableObject<Bindings> {
     }
   }
 
-  private bindSocket(ws: WebSocket) {
+  private bindSocket(ws: WebSocket, alreadyAccepted = false) {
     this.socket = ws;
-    ws.accept();
 
     ws.addEventListener("message", (event) => {
-      void this.onSocketMessage(ws, event.data);
+      void this.onSocketMessage(ws, event.data as string | ArrayBuffer | Blob);
     });
     ws.addEventListener("close", () => {
       if (this.socket === ws) this.socket = null;
@@ -228,6 +251,14 @@ export class ChzzkSessionDO extends DurableObject<Bindings> {
       this.clearPing();
       void this.onSocketError();
     });
+    if (!alreadyAccepted && typeof (ws as WebSocket & { accept?: () => void }).accept === "function") {
+      // fetch()-upgrade sockets need accept(); new WebSocket() does not.
+      try {
+        (ws as WebSocket & { accept: () => void }).accept();
+      } catch {
+        /* already accepted / client socket */
+      }
+    }
   }
 
   private async startSession(): Promise<void> {
@@ -239,17 +270,35 @@ export class ChzzkSessionDO extends DurableObject<Bindings> {
       await this.setStatus("connecting", "");
       const token = await this.ensureFreshToken();
       const sessionUrl = await createUserSessionUrl(token);
-      const wsUrl = toEngineIoWsUrl(sessionUrl);
+      const wssUrl = toEngineIoUrl(sessionUrl, false);
 
-      const res = await fetch(wsUrl, {
-        headers: { Upgrade: "websocket" },
+      const ws = new WebSocket(wssUrl);
+      this.bindSocket(ws, true);
+
+      await new Promise<void>((resolve, reject) => {
+        if (ws.readyState === WebSocket.OPEN) {
+          resolve();
+          return;
+        }
+        if (ws.readyState === WebSocket.CLOSED || ws.readyState === WebSocket.CLOSING) {
+          reject(new Error("WebSocket closed before open"));
+          return;
+        }
+        const timer = setTimeout(() => reject(new Error("WebSocket open timeout")), 12_000);
+        const onOpen = () => {
+          clearTimeout(timer);
+          resolve();
+        };
+        const onErr = () => {
+          clearTimeout(timer);
+          reject(new Error("WebSocket open failed"));
+        };
+        ws.addEventListener("open", onOpen, { once: true });
+        ws.addEventListener("error", onErr, { once: true });
       });
-      const ws = res.webSocket;
-      if (!ws) {
-        throw new Error(`WebSocket upgrade failed (${res.status})`);
-      }
-      this.bindSocket(ws);
-      this.ctx.storage.setAlarm(Date.now() + 50 * 60 * 1000);
+
+      await this.setStatus("connecting", `open ${new URL(wssUrl).host}`);
+      this.ctx.storage.setAlarm(Date.now() + 20_000);
     } finally {
       this.connecting = false;
     }
@@ -262,15 +311,32 @@ export class ChzzkSessionDO extends DurableObject<Bindings> {
     await this.ctx.storage.deleteAlarm();
   }
 
-  private async onSocketMessage(ws: WebSocket, message: string | ArrayBuffer) {
+  private async onSocketMessage(
+    ws: WebSocket,
+    message: string | ArrayBuffer | Blob,
+  ) {
     this.channelId =
       (await this.ctx.storage.get<string>("channelId")) ?? this.channelId;
-    const text =
-      typeof message === "string" ? message : new TextDecoder().decode(message);
+
+    let text: string;
+    if (typeof message === "string") {
+      text = message;
+    } else if (message instanceof ArrayBuffer) {
+      text = new TextDecoder().decode(message);
+    } else if (typeof Blob !== "undefined" && message instanceof Blob) {
+      text = await message.text();
+    } else {
+      text = new TextDecoder().decode(new Uint8Array(message as ArrayBufferLike));
+    }
     if (!text) return;
 
+    // Breadcrumb for admin UI while waiting for SYSTEM connected
+    if (!this.sessionKey) {
+      const crumb = text.length > 80 ? `${text.slice(0, 80)}…` : text;
+      await this.setStatus("connecting", `pkt ${crumb}`);
+    }
+
     // Engine.IO open — do NOT send Socket.IO CONNECT ("40") on root `/`
-    // (Chzzk treats that as an unauthenticated reconnect and may auth-fail).
     if (text.startsWith("0")) {
       try {
         const handshake = JSON.parse(text.slice(1)) as { pingInterval?: number };
@@ -325,21 +391,46 @@ export class ChzzkSessionDO extends DurableObject<Bindings> {
   }
 
   private async onSystem(data: unknown) {
-    const body = data as {
+    const body = (typeof data === "object" && data !== null ? data : {}) as {
       type?: string;
-      data?: { sessionKey?: string };
+      data?: { sessionKey?: string } | string;
+      sessionKey?: string;
     };
-    if (body.type === "connected" && body.data?.sessionKey) {
-      this.sessionKey = body.data.sessionKey;
-      try {
-        const token = await this.ensureFreshToken();
-        await subscribeSessionEvent(token, "donation", this.sessionKey);
-        await subscribeSessionEvent(token, "chat", this.sessionKey);
-        await this.setStatus("connected", this.sessionKey);
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        await this.setStatus("error", msg);
+
+    let sessionKey: string | undefined;
+    if (body.type === "connected") {
+      if (typeof body.data === "string") {
+        try {
+          sessionKey = (JSON.parse(body.data) as { sessionKey?: string }).sessionKey;
+        } catch {
+          sessionKey = undefined;
+        }
+      } else {
+        sessionKey = body.data?.sessionKey;
       }
+    }
+    if (!sessionKey && typeof body.sessionKey === "string") {
+      sessionKey = body.sessionKey;
+    }
+
+    if (!sessionKey) {
+      await this.setStatus(
+        "connecting",
+        `SYSTEM ${JSON.stringify(data).slice(0, 120)}`,
+      );
+      return;
+    }
+
+    this.sessionKey = sessionKey;
+    try {
+      const token = await this.ensureFreshToken();
+      await subscribeSessionEvent(token, "donation", this.sessionKey);
+      await subscribeSessionEvent(token, "chat", this.sessionKey);
+      await this.setStatus("connected", this.sessionKey);
+      this.ctx.storage.setAlarm(Date.now() + 50 * 60 * 1000);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      await this.setStatus("error", msg);
     }
   }
 
