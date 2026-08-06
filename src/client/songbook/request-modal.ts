@@ -110,12 +110,16 @@ export function closeRequestModal(state: SongbookState) {
   pendingRequester = "";
 }
 
-export async function copyRequestCommand(toast: ToastController) {
+export async function copyRequestCommand(
+  state: SongbookState,
+  toast: ToastController,
+) {
   const text = $("#req-command-text").textContent?.trim() ?? "";
   if (!text) return;
   try {
     await navigator.clipboard.writeText(text);
-    toast.show("명령문을 복사했습니다.");
+    closeRequestModal(state);
+    toast.show("복사했습니다. 치지직 채팅이나 후원 메시지에 붙여 넣으세요.");
   } catch {
     toast.show("복사에 실패했습니다. 직접 선택해 복사해 주세요.");
   }

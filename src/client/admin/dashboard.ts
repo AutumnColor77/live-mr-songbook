@@ -1,16 +1,11 @@
 import {
   AdminAuthError,
-  chzzkConnectUrl,
   clearQueue,
   fetchAdminRequests,
-  fetchChzzkStatus,
   fetchPublicStatus,
   patchAdminSettings,
   patchRequestStatus,
   reorderQueue,
-  restartChzzkSession,
-  unlinkChzzk,
-  type ChzzkAdminStatus,
 } from "../admin-api";
 import { logout, type AuthUser } from "../auth-api";
 import { $, escapeHtml } from "../dom";
@@ -72,19 +67,6 @@ export async function mountDashboard(
           <button id="accepting-toggle" type="button" class="primary-btn btn-sm">신청 마감하기</button>
         </section>
 
-        <section class="panel p-4 space-y-3">
-          <div>
-            <p class="text-xs font-extrabold text-dim tracking-wide mb-1">치지직 실시간 연결</p>
-            <p class="text-xs font-medium text-muted">채팅·후원 신청을 받으려면 스트리머 치지직 계정을 연결하세요.</p>
-          </div>
-          <p id="chzzk-link-label" class="text-xs font-medium text-muted">불러오는 중…</p>
-          <div class="flex flex-wrap gap-2">
-            <a id="chzzk-connect" href="${chzzkConnectUrl(slug)}" class="primary-btn btn-sm">치지직 연결</a>
-            <button id="chzzk-session" type="button" class="secondary-btn btn-sm" hidden>세션 재시작</button>
-            <button id="chzzk-unlink" type="button" class="secondary-btn btn-sm" hidden>연결 해제</button>
-          </div>
-        </section>
-
         <section class="panel p-5">
           <div class="flex items-center gap-3">
             <span class="dock-art">${icons.disc(22)}</span>
@@ -128,19 +110,13 @@ export async function mountDashboard(
 
   let status: StatusResponse | null = null;
   let requests: SongRequest[] = [];
-  let chzzk: ChzzkAdminStatus | null = null;
   let busy = false;
   /** Remember past-block preference while policy is allow. */
   let preferPlayed = false;
   const toast = createToast(root);
 
-  const chzzkQuery = new URLSearchParams(window.location.search).get("chzzk");
-  if (chzzkQuery === "ok") {
-    toast.show("치지직 계정을 연결했습니다.");
-    history.replaceState({}, "", `/c/${slug}/admin`);
-  } else if (chzzkQuery === "error") {
-    toast.show("치지직 연결에 실패했습니다. 다시 시도해 주세요.");
-    history.replaceState({}, "", `/c/${slug}/admin`);
+  if (toastMsg) {
+    toast.show(toastMsg);
   }
 
   function queueActionsHtml(item: SongRequest): string {
@@ -171,37 +147,6 @@ export async function mountDashboard(
     toggle.textContent = accepting ? "신청 마감하기" : "신청 다시 열기";
     toggle.classList.toggle("primary-btn", accepting);
     toggle.classList.toggle("secondary-btn", !accepting);
-
-    const linkLabel = $("#chzzk-link-label");
-    const connectBtn = $("#chzzk-connect") as HTMLAnchorElement;
-    const sessionBtn = $("#chzzk-session") as HTMLButtonElement;
-    const unlinkBtn = $("#chzzk-unlink") as HTMLButtonElement;
-    if (!chzzk) {
-      linkLabel.textContent = "불러오는 중…";
-    } else if (!chzzk.configured) {
-      linkLabel.textContent =
-        "서버에 CHZZK_CLIENT_ID / SECRET이 없습니다. docs/chzzk-realtime-integration.md 참고.";
-      connectBtn.hidden = true;
-      sessionBtn.hidden = true;
-      unlinkBtn.hidden = true;
-    } else if (!chzzk.linked) {
-      linkLabel.textContent = "연결되지 않음 — 스트리머 치지직 계정으로 연결하세요.";
-      connectBtn.hidden = false;
-      sessionBtn.hidden = true;
-      unlinkBtn.hidden = true;
-    } else {
-      const name = chzzk.chzzkChannelName || chzzk.chzzkChannelId || "채널";
-      linkLabel.textContent = `${name} · 세션 ${chzzk.sessionStatus}${
-        chzzk.live === false && chzzk.sessionStatus === "connected"
-          ? " (소켓 끊김·재연결 중)"
-          : chzzk.sessionDetail
-            ? ` (${chzzk.sessionDetail.slice(0, 40)})`
-            : ""
-      }`;
-      connectBtn.hidden = true;
-      sessionBtn.hidden = false;
-      unlinkBtn.hidden = false;
-    }
 
     const dupPolicy = resolveDuplicatePolicy(status);
     if (dupPolicy === "played") preferPlayed = true;
@@ -280,14 +225,12 @@ export async function mountDashboard(
 
   async function refresh() {
     try {
-      const [s, reqs, cz] = await Promise.all([
+      const [s, reqs] = await Promise.all([
         fetchPublicStatus(slug),
         fetchAdminRequests(slug),
-        fetchChzzkStatus(slug).catch(() => null),
       ]);
       status = s;
       requests = reqs;
-      chzzk = cz;
       render();
     } catch (err) {
       if (err instanceof AdminAuthError) {
@@ -322,43 +265,6 @@ export async function mountDashboard(
         return;
       }
       toast.show(err instanceof Error ? err.message : "설정 변경 실패");
-    } finally {
-      busy = false;
-    }
-  });
-
-  $("#chzzk-session").addEventListener("click", async () => {
-    if (busy) return;
-    busy = true;
-    try {
-      await restartChzzkSession(slug);
-      toast.show("치지직 세션을 재시작했습니다.");
-    } catch (err) {
-      if (err instanceof AdminAuthError) {
-        mountLogin(root, slug, "세션이 만료되었습니다. 다시 로그인해 주세요.");
-        return;
-      }
-      toast.show(err instanceof Error ? err.message : "세션 재시작 실패");
-    } finally {
-      busy = false;
-      await refresh().catch(() => undefined);
-    }
-  });
-
-  $("#chzzk-unlink").addEventListener("click", async () => {
-    if (busy) return;
-    if (!confirm("치지직 연결을 해제할까요?")) return;
-    busy = true;
-    try {
-      await unlinkChzzk(slug);
-      toast.show("치지직 연결을 해제했습니다.");
-      await refresh();
-    } catch (err) {
-      if (err instanceof AdminAuthError) {
-        mountLogin(root, slug, "세션이 만료되었습니다. 다시 로그인해 주세요.");
-        return;
-      }
-      toast.show(err instanceof Error ? err.message : "연결 해제 실패");
     } finally {
       busy = false;
     }
@@ -561,9 +467,5 @@ export async function mountDashboard(
 
   await refresh();
   startAdminPolling(() => void refresh(), 4000);
-
-  if (toastMsg) {
-    toast.show(toastMsg);
-  }
 }
 

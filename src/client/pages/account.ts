@@ -7,6 +7,14 @@ import {
   type AuthUser,
   type UserChannel,
 } from "../auth-api";
+import {
+  AdminAuthError,
+  chzzkConnectUrl,
+  fetchChzzkStatus,
+  restartChzzkSession,
+  unlinkChzzk,
+  type ChzzkAdminStatus,
+} from "../admin-api";
 import { $, escapeHtml } from "../dom";
 import { icons } from "../icons";
 import { bindProfileEditor, profileEditorFieldsHtml } from "../profile-editor";
@@ -39,6 +47,14 @@ export async function mountAccount(
             <a href="/c/${escapeHtml(own.slug)}" class="secondary-btn btn-sm flex-1 text-center" target="_blank" rel="noopener">노래책 열기</a>
           </div>
           <button type="button" id="copy-channel-url" class="secondary-btn btn-sm w-full">노래책 주소 복사</button>
+          <div class="border-t border-glass-border pt-3 space-y-2">
+            <p class="text-xs font-extrabold text-dim tracking-wide text-center">치지직 연결</p>
+            <p id="chzzk-link-label" class="text-xs font-medium text-muted text-center">불러오는 중…</p>
+            <div class="flex flex-wrap gap-2 justify-center">
+              <a id="chzzk-connect" href="${chzzkConnectUrl(own.slug)}" class="primary-btn btn-sm">치지직 연결</a>
+              <button id="chzzk-unlink" type="button" class="secondary-btn btn-sm" hidden>연결 해제</button>
+            </div>
+          </div>
           <details class="border-t border-glass-border pt-3">
             <summary class="cursor-pointer text-xs font-extrabold text-dim tracking-wide text-center list-none">채널 설정</summary>
             <form id="edit-channel-form" class="mt-3 space-y-3" data-channel-id="${escapeHtml(own.id)}">
@@ -145,6 +161,83 @@ export async function mountAccount(
   `;
 
   const toast = createToast(root);
+
+  const chzzkQuery = new URLSearchParams(window.location.search).get("chzzk");
+  if (chzzkQuery === "ok") {
+    toast.show("치지직 계정을 연결했습니다.");
+    history.replaceState({}, "", "/me");
+  } else if (chzzkQuery === "error") {
+    toast.show("치지직 연결에 실패했습니다. 다시 시도해 주세요.");
+    history.replaceState({}, "", "/me");
+  }
+
+  async function refreshChzzk() {
+    if (!own) return;
+    const linkLabel = document.querySelector<HTMLElement>("#chzzk-link-label");
+    const connectBtn = document.querySelector<HTMLAnchorElement>("#chzzk-connect");
+    const unlinkBtn = document.querySelector<HTMLButtonElement>("#chzzk-unlink");
+    if (!linkLabel || !connectBtn || !unlinkBtn) return;
+
+    let chzzk: ChzzkAdminStatus | null = null;
+    try {
+      chzzk = await fetchChzzkStatus(own.slug);
+    } catch (err) {
+      if (err instanceof AdminAuthError) {
+        linkLabel.textContent = "로그인이 필요합니다.";
+        return;
+      }
+      linkLabel.textContent = "상태를 불러오지 못했습니다.";
+      return;
+    }
+
+    if (!chzzk.configured) {
+      linkLabel.textContent = "서버에 치지직 연동이 설정되지 않았습니다.";
+      connectBtn.hidden = true;
+      unlinkBtn.hidden = true;
+      return;
+    }
+
+    if (!chzzk.linked) {
+      linkLabel.textContent = "연결되지 않음 — 한 번 연결하면 계속 유지됩니다.";
+      connectBtn.hidden = false;
+      unlinkBtn.hidden = true;
+      return;
+    }
+
+    const name = chzzk.chzzkChannelName || chzzk.chzzkChannelId || "채널";
+    const liveOk = chzzk.live !== false && chzzk.sessionStatus === "connected";
+    linkLabel.textContent = liveOk
+      ? `${name} · 연결됨`
+      : `${name} · 재연결 중…`;
+    connectBtn.hidden = true;
+    unlinkBtn.hidden = false;
+
+    // Keep the realtime socket alive after page visits.
+    if (chzzk.live === false || chzzk.sessionStatus !== "connected") {
+      void restartChzzkSession(own.slug)
+        .then(() => refreshChzzk())
+        .catch(() => undefined);
+    }
+  }
+
+  void refreshChzzk();
+
+  const unlinkBtn = document.querySelector<HTMLButtonElement>("#chzzk-unlink");
+  if (unlinkBtn && own) {
+    unlinkBtn.addEventListener("click", async () => {
+      if (!confirm("치지직 연결을 해제할까요?")) return;
+      unlinkBtn.disabled = true;
+      try {
+        await unlinkChzzk(own.slug);
+        toast.show("치지직 연결을 해제했습니다.");
+        await refreshChzzk();
+      } catch (err) {
+        toast.show(err instanceof Error ? err.message : "연결 해제 실패");
+      } finally {
+        unlinkBtn.disabled = false;
+      }
+    });
+  }
 
   $("#theme-btn").addEventListener("click", () => {
     cycleTheme();

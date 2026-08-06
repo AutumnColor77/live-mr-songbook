@@ -249,7 +249,9 @@ export async function mountSongbook(
 
   $("#close-request-modal").addEventListener("click", () => closeRequestModal(state));
   $("#request-modal-overlay").addEventListener("click", () => closeRequestModal(state));
-  $("#copy-request-cmd").addEventListener("click", () => void copyRequestCommand(toast));
+  $("#copy-request-cmd").addEventListener("click", () =>
+    void copyRequestCommand(state, toast),
+  );
   $("#submit-request-btn").addEventListener("click", () =>
     void handleSubmitRequest(state, toast, refreshQueueAndStatus),
   );

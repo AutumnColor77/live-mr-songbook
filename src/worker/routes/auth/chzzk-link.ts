@@ -47,7 +47,7 @@ chzzkAuth.get("/chzzk/callback", async (c) => {
   const user = await loadUserFromSession(c);
   if (!user || user.id !== payload.userId) {
     return c.redirect(
-      `/c/${encodeURIComponent(payload.slug)}/admin?chzzk=error&reason=session`,
+      `/me?chzzk=error&reason=session`,
     );
   }
 
@@ -79,12 +79,10 @@ chzzkAuth.get("/chzzk/callback", async (c) => {
       });
     }
 
-    return c.redirect(`/c/${encodeURIComponent(payload.slug)}/admin?chzzk=ok`);
+    return c.redirect(`/me?chzzk=ok`);
   } catch (err) {
     console.error("[chzzk] oauth callback failed", err);
-    return c.redirect(
-      `/c/${encodeURIComponent(payload.slug)}/admin?chzzk=error&reason=token`,
-    );
+    return c.redirect(`/me?chzzk=error&reason=token`);
   }
 });
 
