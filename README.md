@@ -82,7 +82,7 @@ npx wrangler secret put CHZZK_CLIENT_SECRET
    - 로컬: `http://localhost:5173/api/auth/chzzk/callback`  
    - 프로덕션: `https://<worker>.workers.dev/api/auth/chzzk/callback`
 2. `.dev.vars` / Workers secrets에 `CHZZK_CLIENT_ID` · `CHZZK_CLIENT_SECRET`
-3. 채널 운영 화면에서 **치지직 연결** → 세션 상태 확인  
+3. `/me`에서 **치지직 연결** (한 번 연결 후 세션 유지)  
 4. `npm run db:migrate:remote` (또는 `deploy:with-migrate`)로 `0015`·`0016` 적용
 
 ## Multi-tenant model
