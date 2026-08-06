@@ -112,6 +112,7 @@ export type ChzzkAdminStatus = {
   sessionStatus: string;
   sessionDetail: string;
   connectedAt: number | null;
+  live?: boolean;
 };
 
 export async function fetchChzzkStatus(slug: string): Promise<ChzzkAdminStatus> {

@@ -23,9 +23,36 @@ function sessionStub(env: AppEnv["Bindings"], channelId: string) {
 chzzkAdmin.get("/chzzk", async (c) => {
   const channelId = c.get("channel").id;
   const link = await getChzzkLink(c.env.DB, channelId);
+  const stub = sessionStub(c.env, channelId);
+  let live = false;
+  if (stub && link) {
+    try {
+      const statusRes = await stub.fetch("https://do/status");
+      const status = (await statusRes.json().catch(() => ({}))) as {
+        live?: boolean;
+        sockets?: number;
+      };
+      live = Boolean(status.live || (status.sockets && status.sockets > 0));
+      // Stale "connected" in DB while socket is dead — heal in background.
+      if (!live && link.session_status === "connected") {
+        c.executionCtx.waitUntil(
+          stub
+            .fetch("https://do/ensure", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ channelId }),
+            })
+            .catch(() => undefined),
+        );
+      }
+    } catch {
+      live = false;
+    }
+  }
   return c.json({
     configured: chzzkConfigured(c.env),
     ...publicChzzkStatus(link),
+    live,
   });
 });
 

@@ -12,6 +12,10 @@ import {
 import { ingestChzzkRequest } from "./request-ingest";
 import type { Bindings } from "./types";
 
+const PING_ALARM_MS = 20_000;
+const RECONNECT_ALARM_MS = 15_000;
+const CONNECT_TIMEOUT_MS = 25_000;
+
 /**
  * Convert Chzzk session URL to Engine.IO websocket upgrade URL (Socket.IO 2.x / EIO3).
  * Workers fetch() requires http(s):// even for Upgrade: websocket — runtime maps to ws(s).
@@ -63,14 +67,15 @@ function socketOpen(ws: WebSocket | null): boolean {
 
 /**
  * Outbound Chzzk Session socket.
- * Hibernation (`ctx.acceptWebSocket`) only works for *incoming* sockets — use `ws.accept()` + listeners.
+ * Hibernation only works for incoming sockets — use ws.accept() + listeners,
+ * and DO alarms for Engine.IO client pings / reconnect (setInterval is unreliable).
  */
 export class ChzzkSessionDO extends DurableObject<Bindings> {
   private channelId = "";
   private sessionKey = "";
   private connecting = false;
   private socket: WebSocket | null = null;
-  private pingTimer: ReturnType<typeof setInterval> | null = null;
+  private wantRunning = false;
 
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
@@ -93,9 +98,15 @@ export class ChzzkSessionDO extends DurableObject<Bindings> {
       if (!this.channelId) {
         return Response.json({ error: "channelId required" }, { status: 400 });
       }
+      this.wantRunning = true;
+      await this.ctx.storage.put("wantRunning", true);
       try {
         await this.startSession();
-        return Response.json({ ok: true, sessionKey: this.sessionKey || null });
+        return Response.json({
+          ok: true,
+          sessionKey: this.sessionKey || null,
+          live: socketOpen(this.socket),
+        });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         await this.setStatus("error", msg);
@@ -106,6 +117,8 @@ export class ChzzkSessionDO extends DurableObject<Bindings> {
     if (request.method === "POST" && (path === "/stop" || path.endsWith("/stop"))) {
       this.channelId =
         (await this.ctx.storage.get<string>("channelId")) ?? this.channelId;
+      this.wantRunning = false;
+      await this.ctx.storage.put("wantRunning", false);
       await this.stopSession("stopped");
       return Response.json({ ok: true });
     }
@@ -113,10 +126,43 @@ export class ChzzkSessionDO extends DurableObject<Bindings> {
     if (request.method === "GET" && (path === "/status" || path.endsWith("/status"))) {
       this.channelId =
         (await this.ctx.storage.get<string>("channelId")) ?? this.channelId;
+      this.wantRunning =
+        (await this.ctx.storage.get<boolean>("wantRunning")) ?? this.wantRunning;
+      this.sessionKey =
+        (await this.ctx.storage.get<string>("sessionKey")) ?? this.sessionKey;
       return Response.json({
         channelId: this.channelId || null,
         sessionKey: this.sessionKey || null,
+        live: socketOpen(this.socket),
+        wantRunning: this.wantRunning,
         sockets: socketOpen(this.socket) ? 1 : 0,
+      });
+    }
+
+    // Heal: if DB thinks we're connected but socket is dead, restart.
+    if (request.method === "POST" && (path === "/ensure" || path.endsWith("/ensure"))) {
+      this.channelId =
+        (await this.ctx.storage.get<string>("channelId")) ?? this.channelId;
+      this.wantRunning =
+        (await this.ctx.storage.get<boolean>("wantRunning")) ?? true;
+      if (!this.channelId) {
+        return Response.json({ error: "channelId required" }, { status: 400 });
+      }
+      await this.ctx.storage.put("wantRunning", true);
+      this.wantRunning = true;
+      if (!socketOpen(this.socket)) {
+        try {
+          await this.startSession();
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          await this.setStatus("error", msg);
+          return Response.json({ error: msg, live: false }, { status: 500 });
+        }
+      }
+      return Response.json({
+        ok: true,
+        live: socketOpen(this.socket),
+        sessionKey: this.sessionKey || null,
       });
     }
 
@@ -126,36 +172,64 @@ export class ChzzkSessionDO extends DurableObject<Bindings> {
   async alarm(): Promise<void> {
     this.channelId =
       (await this.ctx.storage.get<string>("channelId")) ?? this.channelId;
-    if (!this.channelId) return;
+    this.wantRunning =
+      (await this.ctx.storage.get<boolean>("wantRunning")) ?? false;
+    this.sessionKey =
+      (await this.ctx.storage.get<string>("sessionKey")) ?? this.sessionKey;
+    if (!this.channelId || !this.wantRunning) return;
+
     try {
       const link = await getChzzkLink(this.env.DB, this.channelId);
-      // Stuck after WS upgrade but before SYSTEM connected
+
       if (link?.session_status === "connecting") {
+        const startedAt =
+          (await this.ctx.storage.get<number>("connectingSince")) ?? 0;
         if (!socketOpen(this.socket)) {
           await this.setStatus("error", "socket closed while connecting");
           await this.startSession();
           return;
         }
-        await this.setStatus(
-          "error",
-          "no SYSTEM connected (check scopes / socket packets)",
-        );
-        this.closeSocket("connect timeout");
-        this.ctx.storage.setAlarm(Date.now() + 15_000);
+        if (startedAt && Date.now() - startedAt > CONNECT_TIMEOUT_MS) {
+          await this.setStatus(
+            "error",
+            "no SYSTEM connected (check scopes / socket packets)",
+          );
+          this.closeSocket("connect timeout");
+          this.ctx.storage.setAlarm(Date.now() + RECONNECT_ALARM_MS);
+          return;
+        }
+        // Still connecting — Engine.IO client ping
+        this.sendPing();
+        this.ctx.storage.setAlarm(Date.now() + PING_ALARM_MS);
         return;
       }
 
       await this.ensureFreshToken();
+
       if (!socketOpen(this.socket)) {
+        await this.setStatus("disconnected", "socket missing — reconnecting");
         await this.startSession();
-      } else {
-        this.ctx.storage.setAlarm(Date.now() + 50 * 60 * 1000);
+        return;
       }
+
+      this.sendPing();
+      this.ctx.storage.setAlarm(Date.now() + PING_ALARM_MS);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error("[ChzzkSessionDO] alarm", msg);
       await this.setStatus("error", msg);
-      this.ctx.storage.setAlarm(Date.now() + 60_000);
+      this.ctx.storage.setAlarm(Date.now() + RECONNECT_ALARM_MS);
+    }
+  }
+
+  private sendPing() {
+    const ws = this.socket;
+    if (!socketOpen(ws)) return;
+    try {
+      // Engine.IO v3: client sends ping ("2"), server replies pong ("3")
+      ws!.send("2");
+    } catch {
+      /* ignore */
     }
   }
 
@@ -192,32 +266,7 @@ export class ChzzkSessionDO extends DurableObject<Bindings> {
     return tokens.accessToken;
   }
 
-  private clearPing() {
-    if (this.pingTimer) {
-      clearInterval(this.pingTimer);
-      this.pingTimer = null;
-    }
-  }
-
-  private startPing(ws: WebSocket, intervalMs: number) {
-    this.clearPing();
-    const ms = Math.max(5_000, intervalMs || 25_000);
-    this.pingTimer = setInterval(() => {
-      if (ws.readyState !== WebSocket.OPEN) {
-        this.clearPing();
-        return;
-      }
-      try {
-        // Engine.IO v3: client sends ping ("2"), server replies pong ("3")
-        ws.send("2");
-      } catch {
-        this.clearPing();
-      }
-    }, ms);
-  }
-
   private closeSocket(reason: string) {
-    this.clearPing();
     const ws = this.socket;
     this.socket = null;
     if (!ws) return;
@@ -231,19 +280,16 @@ export class ChzzkSessionDO extends DurableObject<Bindings> {
   private bindSocket(ws: WebSocket) {
     this.socket = ws;
 
-    // Listeners MUST be registered before accept() or the first Engine.IO
-    // open / SYSTEM packets can be missed.
+    // Listeners MUST be registered before accept() or early packets are missed.
     ws.addEventListener("message", (event) => {
       void this.onSocketMessage(ws, event.data as string | ArrayBuffer | Blob);
     });
     ws.addEventListener("close", (event) => {
       if (this.socket === ws) this.socket = null;
-      this.clearPing();
       void this.onSocketClose(event.code, event.reason);
     });
     ws.addEventListener("error", () => {
       if (this.socket === ws) this.socket = null;
-      this.clearPing();
       void this.onSocketError();
     });
     ws.accept();
@@ -255,6 +301,8 @@ export class ChzzkSessionDO extends DurableObject<Bindings> {
     try {
       this.closeSocket("restart");
       this.sessionKey = "";
+      await this.ctx.storage.delete("sessionKey");
+      await this.ctx.storage.put("connectingSince", Date.now());
       await this.setStatus("connecting", "starting");
       const token = await this.ensureFreshToken();
       const sessionUrl = await createUserSessionUrl(token);
@@ -279,7 +327,7 @@ export class ChzzkSessionDO extends DurableObject<Bindings> {
         }),
       );
 
-      this.ctx.storage.setAlarm(Date.now() + 20_000);
+      this.ctx.storage.setAlarm(Date.now() + PING_ALARM_MS);
     } finally {
       this.connecting = false;
     }
@@ -288,12 +336,13 @@ export class ChzzkSessionDO extends DurableObject<Bindings> {
   private async stopSession(reason: string) {
     this.closeSocket(reason);
     this.sessionKey = "";
+    await this.ctx.storage.delete("sessionKey");
     await this.setStatus("disconnected", reason);
     await this.ctx.storage.deleteAlarm();
   }
 
   private async onSocketMessage(
-    ws: WebSocket,
+    _ws: WebSocket,
     message: string | ArrayBuffer | Blob,
   ) {
     this.channelId =
@@ -313,7 +362,6 @@ export class ChzzkSessionDO extends DurableObject<Bindings> {
     }
     if (!text) return;
 
-    // Breadcrumb for admin UI while waiting for SYSTEM connected
     if (!this.sessionKey) {
       const crumb = text.length > 80 ? `${text.slice(0, 80)}…` : text;
       await this.setStatus("connecting", `pkt ${crumb}`);
@@ -321,16 +369,11 @@ export class ChzzkSessionDO extends DurableObject<Bindings> {
 
     // Engine.IO open — do NOT send Socket.IO CONNECT ("40") on root `/`
     if (text.startsWith("0")) {
-      try {
-        const handshake = JSON.parse(text.slice(1)) as { pingInterval?: number };
-        this.startPing(ws, handshake.pingInterval ?? 25_000);
-      } catch {
-        this.startPing(ws, 25_000);
-      }
+      // Ping is driven by DO alarm (setInterval is unreliable across DO suspend).
+      this.ctx.storage.setAlarm(Date.now() + PING_ALARM_MS);
       return;
     }
 
-    // Engine.IO pong (reply to our ping) — ignore
     if (text === "3") return;
 
     const parsed = parseSocketIoPayload(text);
@@ -358,30 +401,45 @@ export class ChzzkSessionDO extends DurableObject<Bindings> {
   private async onSocketClose(code = 0, reason = "") {
     this.channelId =
       (await this.ctx.storage.get<string>("channelId")) ?? this.channelId;
-    if (this.channelId) {
-      const detail = reason
-        ? `socket closed ${code} ${reason}`.slice(0, 200)
-        : `socket closed ${code}`;
-      await this.setStatus("disconnected", detail);
-      this.ctx.storage.setAlarm(Date.now() + 15_000);
+    this.wantRunning =
+      (await this.ctx.storage.get<boolean>("wantRunning")) ?? false;
+    if (!this.channelId) return;
+    const detail = reason
+      ? `socket closed ${code} ${reason}`.slice(0, 200)
+      : `socket closed ${code}`;
+    await this.setStatus("disconnected", detail);
+    if (this.wantRunning) {
+      this.ctx.storage.setAlarm(Date.now() + RECONNECT_ALARM_MS);
     }
   }
 
   private async onSocketError() {
     this.channelId =
       (await this.ctx.storage.get<string>("channelId")) ?? this.channelId;
-    if (this.channelId) {
-      await this.setStatus("error", "socket error");
-      this.ctx.storage.setAlarm(Date.now() + 15_000);
+    this.wantRunning =
+      (await this.ctx.storage.get<boolean>("wantRunning")) ?? false;
+    if (!this.channelId) return;
+    await this.setStatus("error", "socket error");
+    if (this.wantRunning) {
+      this.ctx.storage.setAlarm(Date.now() + RECONNECT_ALARM_MS);
     }
   }
 
   private async onSystem(data: unknown) {
     const body = (typeof data === "object" && data !== null ? data : {}) as {
       type?: string;
-      data?: { sessionKey?: string } | string;
+      data?: { sessionKey?: string; eventType?: string } | string;
       sessionKey?: string;
     };
+
+    if (body.type === "subscribed") {
+      const ev =
+        typeof body.data === "object" && body.data
+          ? body.data.eventType
+          : undefined;
+      console.log("[ChzzkSessionDO] subscribed", ev);
+      return;
+    }
 
     let sessionKey: string | undefined;
     if (body.type === "connected") {
@@ -408,15 +466,18 @@ export class ChzzkSessionDO extends DurableObject<Bindings> {
     }
 
     this.sessionKey = sessionKey;
+    await this.ctx.storage.put("sessionKey", sessionKey);
+    await this.ctx.storage.delete("connectingSince");
     try {
       const token = await this.ensureFreshToken();
       await subscribeSessionEvent(token, "donation", this.sessionKey);
       await subscribeSessionEvent(token, "chat", this.sessionKey);
       await this.setStatus("connected", this.sessionKey);
-      this.ctx.storage.setAlarm(Date.now() + 50 * 60 * 1000);
+      this.ctx.storage.setAlarm(Date.now() + PING_ALARM_MS);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       await this.setStatus("error", msg);
+      this.ctx.storage.setAlarm(Date.now() + RECONNECT_ALARM_MS);
     }
   }
 

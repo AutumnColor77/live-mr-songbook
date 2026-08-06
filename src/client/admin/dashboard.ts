@@ -220,7 +220,11 @@ export async function mountDashboard(
     } else {
       const name = chzzk.chzzkChannelName || chzzk.chzzkChannelId || "채널";
       linkLabel.textContent = `${name} · 세션 ${chzzk.sessionStatus}${
-        chzzk.sessionDetail ? ` (${chzzk.sessionDetail.slice(0, 40)})` : ""
+        chzzk.live === false && chzzk.sessionStatus === "connected"
+          ? " (소켓 끊김·재연결 중)"
+          : chzzk.sessionDetail
+            ? ` (${chzzk.sessionDetail.slice(0, 40)})`
+            : ""
       }`;
       connectBtn.hidden = true;
       sessionBtn.hidden = false;
