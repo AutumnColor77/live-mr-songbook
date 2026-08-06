@@ -34,7 +34,8 @@ function sourceAllowed(mode: RequestMode, source: IngestSource): boolean {
   return source === "donation";
 }
 
-function requiredPayAmount(song: SongRow, channelPriceKrw: number): number {
+/** Per-song donation floor; null/missing falls back to channel default (now always 0). */
+export function requiredPayAmount(song: SongRow, channelPriceKrw: number): number {
   if (
     typeof song.donation_amount === "number" &&
     Number.isFinite(song.donation_amount) &&
@@ -43,6 +44,10 @@ function requiredPayAmount(song: SongRow, channelPriceKrw: number): number {
     return Math.round(song.donation_amount);
   }
   return channelPriceKrw;
+}
+
+export function songRequiresDonation(song: SongRow, channelPriceKrw = 0): boolean {
+  return requiredPayAmount(song, channelPriceKrw) > 0;
 }
 
 export async function ingestChzzkRequest(
@@ -141,6 +146,16 @@ export async function ingestChzzkRequest(
     };
   }
   const song = matches[0]!;
+  const required = requiredPayAmount(song, settings.priceKrw);
+
+  // Paid songs: donation only (no free chat / web path).
+  if (source === "chat" && required > 0) {
+    return {
+      ok: false,
+      status: 403,
+      error: `이 곡은 후원(${required.toLocaleString("ko-KR")}원 이상)으로만 신청할 수 있습니다.`,
+    };
+  }
 
   let payAmount: number | null = null;
   if (source === "donation") {
@@ -152,7 +167,6 @@ export async function ingestChzzkRequest(
       return { ok: false, status: 400, error: "payAmount is required for donations" };
     }
     payAmount = Math.min(Math.round(raw), 100_000_000);
-    const required = requiredPayAmount(song, settings.priceKrw);
     if (payAmount < required) {
       return {
         ok: false,

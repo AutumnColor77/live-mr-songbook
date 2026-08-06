@@ -4,6 +4,7 @@ import {
   loadDuplicatePolicy,
 } from "../duplicate-policy";
 import { newId } from "../id";
+import { songRequiresDonation } from "../request-ingest";
 import { loadRequestCommandSettings } from "../request-settings";
 import { mapRequest, type AppEnv, type RequestRow, type SongRow } from "../types";
 
@@ -53,6 +54,16 @@ requests.post("/", async (c) => {
     .first<SongRow>();
   if (!song) {
     return c.json({ error: "Song not found" }, 404);
+  }
+
+  if (songRequiresDonation(song, requestSettings.priceKrw)) {
+    const min = Math.round(Number(song.donation_amount) || requestSettings.priceKrw);
+    return c.json(
+      {
+        error: `이 곡은 후원(${min.toLocaleString("ko-KR")}원 이상)으로만 신청할 수 있습니다. 명령문을 복사해 후원 메시지에 붙여 넣으세요.`,
+      },
+      403,
+    );
   }
 
   const { policy, sessionStartedAt } = await loadDuplicatePolicy(c.env.DB, channelId);

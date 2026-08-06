@@ -76,7 +76,8 @@ export function openRequestModal(
       ? `명령문 복사 후, 치지직에서 ${formatMinDonationLabel(price)} 후원하며 메시지에 붙여 넣으세요.`
       : "명령문 복사 후, 치지직에서 후원하며 메시지에 붙여 넣으세요.";
 
-  if (mode === "paid") {
+  // Per-song paid: donation only (no web free submit / chat free path).
+  if (price > 0 || mode === "paid") {
     setHowtoRows([{ label: "유료", text: paidHow }]);
     paidHint.hidden = true;
     submitBtn.hidden = true;
@@ -95,7 +96,6 @@ export function openRequestModal(
         label: "무료",
         text: "웹에서 신청하기를 누르거나, 명령문을 복사해 치지직 채팅에 붙여 넣으세요.",
       },
-      { label: "유료", text: paidHow },
     ]);
     paidHint.hidden = true;
     submitBtn.hidden = false;
@@ -116,10 +116,15 @@ export async function copyRequestCommand(
 ) {
   const text = $("#req-command-text").textContent?.trim() ?? "";
   if (!text) return;
+  const price = minPriceKrw(state, state.selectedSong?.donationAmount);
   try {
     await navigator.clipboard.writeText(text);
     closeRequestModal(state);
-    toast.show("복사했습니다. 치지직 채팅이나 후원 메시지에 붙여 넣으세요.");
+    toast.show(
+      price > 0
+        ? `복사했습니다. 치지직에서 ${formatMinDonationLabel(price)} 후원 메시지에 붙여 넣으세요.`
+        : "복사했습니다. 치지직 채팅이나 후원 메시지에 붙여 넣으세요.",
+    );
   } catch {
     toast.show("복사에 실패했습니다. 직접 선택해 복사해 주세요.");
   }
@@ -133,6 +138,13 @@ export async function handleSubmitRequest(
   if (!state.selectedSong || state.submitting) return;
   if (requestMode(state) === "paid") {
     toast.show("이 채널은 치지직 후원으로만 신청할 수 있습니다.");
+    return;
+  }
+  const price = minPriceKrw(state, state.selectedSong.donationAmount);
+  if (price > 0) {
+    toast.show(
+      `이 곡은 후원(${price.toLocaleString("ko-KR")}원 이상)으로만 신청할 수 있습니다.`,
+    );
     return;
   }
   state.submitting = true;
