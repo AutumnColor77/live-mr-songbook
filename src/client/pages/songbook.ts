@@ -1,5 +1,6 @@
 import {
   fetchQueue,
+  fetchSong,
   fetchSongs,
   fetchStatus,
   setChannelSlug,
@@ -17,6 +18,7 @@ import {
   loginButtonHtml,
   loginPickerOverlayHtml,
 } from "../login-picker";
+import { createNowPlayingArtCache } from "../now-playing";
 import {
   applyFilterPanelOpen,
   applyViewMode,
@@ -100,6 +102,7 @@ export async function mountSongbook(
     artists: [],
     queue: [],
     status: null,
+    nowPlayingArt: "",
     selectedSong: null,
     submitting: false,
     viewMode: readViewMode(),
@@ -108,6 +111,10 @@ export async function mountSongbook(
 
   const toast = createToast(root);
   const gate = createRequestGate(state);
+  const resolveNowPlayingArt = createNowPlayingArtCache(async (songId) => {
+    const song = await fetchSong(songId);
+    return song.thumbnail ?? "";
+  });
 
   if (authToast) toast.show(authToast);
   if (errorNotice) toast.show(errorNotice);
@@ -150,6 +157,7 @@ export async function mountSongbook(
       const [status, queue] = await Promise.all([fetchStatus(), fetchQueue()]);
       state.status = status;
       state.queue = queue;
+      state.nowPlayingArt = await resolveNowPlayingArt(status, state.songs);
       updateStatusUI(state, gate, slug);
       renderSongs(state, gate);
     } catch (err) {

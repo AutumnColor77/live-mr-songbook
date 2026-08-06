@@ -10,7 +10,7 @@ import {
 import { logout, type AuthUser } from "../auth-api";
 import { $, escapeHtml } from "../dom";
 import { icons } from "../icons";
-import { nowPlayingLabel } from "../now-playing";
+import { nowPlayingLabel, setDockArt, createNowPlayingArtCache } from "../now-playing";
 import { cycleTheme, logoLinkHtml } from "../theme";
 import { createToast } from "../toast";
 import type { DuplicatePolicy, SongRequest, StatusResponse } from "../types";
@@ -69,7 +69,7 @@ export async function mountDashboard(
 
         <section class="panel p-5">
           <div class="flex items-center gap-3">
-            <span class="dock-art">${icons.disc(22)}</span>
+            <span id="admin-now-playing-art" class="dock-art">${icons.disc(22)}</span>
             <div class="min-w-0 flex-1">
               <p class="dock-label">지금 재생</p>
               <p id="admin-now-playing" class="song-name text-sm">재생 중인 곡이 없습니다.</p>
@@ -111,9 +111,21 @@ export async function mountDashboard(
   let status: StatusResponse | null = null;
   let requests: SongRequest[] = [];
   let busy = false;
+  let nowPlayingArt = "";
   /** Remember past-block preference while policy is allow. */
   let preferPlayed = false;
   const toast = createToast(root);
+  const resolveNowPlayingArt = createNowPlayingArtCache(async (songId) => {
+    const res = await fetch(
+      `/api/c/${encodeURIComponent(slug)}/songs/${encodeURIComponent(songId)}`,
+    );
+    const data = (await res.json().catch(() => ({}))) as {
+      song?: { thumbnail?: string };
+      error?: string;
+    };
+    if (!res.ok) throw new Error(data.error ?? `Request failed (${res.status})`);
+    return data.song?.thumbnail ?? "";
+  });
 
   if (toastMsg) {
     toast.show(toastMsg);
@@ -173,6 +185,7 @@ export async function mountDashboard(
       : "클릭하면 대기열 중복을 차단합니다";
 
     $("#admin-now-playing").textContent = nowPlayingLabel(status);
+    setDockArt($("#admin-now-playing-art"), nowPlayingArt, 22);
 
     const active = requests
       .filter((r) => r.status === "pending" || r.status === "playing")
@@ -231,6 +244,7 @@ export async function mountDashboard(
       ]);
       status = s;
       requests = reqs;
+      nowPlayingArt = await resolveNowPlayingArt(status);
       render();
     } catch (err) {
       if (err instanceof AdminAuthError) {

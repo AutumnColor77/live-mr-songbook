@@ -318,6 +318,19 @@ a.secondary-btn {
   color: var(--accent-primary);
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
   flex-shrink: 0;
+  overflow: hidden;
+}
+
+.dock-art.has-image {
+  padding: 0;
+  color: transparent;
+}
+
+.dock-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 .dock-label {

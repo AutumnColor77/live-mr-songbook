@@ -1,6 +1,6 @@
 import { $, escapeHtml } from "../dom";
 import { icons } from "../icons";
-import { nowPlayingLabel } from "../now-playing";
+import { nowPlayingLabel, setDockArt } from "../now-playing";
 import type { SongRequest } from "../types";
 import type { RequestGate } from "./request-gate";
 import type { SongbookState } from "./types";
@@ -59,6 +59,8 @@ export function updateStatusUI(state: SongbookState, gate: RequestGate, slug: st
   const label = nowPlayingLabel(state.status);
   $("#now-playing-text").textContent = label;
   $("#aside-now-playing").textContent = label;
+  setDockArt($("#now-playing-art"), state.nowPlayingArt, 20);
+  setDockArt($("#aside-now-playing-art"), state.nowPlayingArt, 22);
   $("#queue-badge").textContent = String(pending);
   $("#aside-queue-count").textContent = String(pending);
 

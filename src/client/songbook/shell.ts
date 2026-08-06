@@ -84,7 +84,7 @@ export function songbookShellHtml(opts: {
         <aside class="hidden lg:block sticky top-24">
           <div class="panel p-5">
             <div class="flex items-center gap-3 pb-4 mb-4 border-b border-glass-border">
-              <span class="dock-art">${icons.disc(22)}</span>
+              <span id="aside-now-playing-art" class="dock-art">${icons.disc(22)}</span>
               <div class="min-w-0">
                 <p class="dock-label">지금 재생</p>
                 <p id="aside-now-playing" class="song-name text-sm">재생 중인 곡이 없습니다.</p>
@@ -103,7 +103,7 @@ export function songbookShellHtml(opts: {
     <div class="dock lg:hidden fixed bottom-0 inset-x-0 z-30 pb-[env(safe-area-inset-bottom)]">
       <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
         <div class="flex items-center gap-3 min-w-0">
-          <span class="dock-art">${icons.disc(20)}</span>
+          <span id="now-playing-art" class="dock-art">${icons.disc(20)}</span>
           <div class="min-w-0">
             <p class="dock-label">지금 재생</p>
             <p id="now-playing-text" class="song-name text-sm">재생 중인 곡이 없습니다.</p>

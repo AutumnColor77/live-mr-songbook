@@ -48,6 +48,13 @@ export async function fetchSongs(
   };
 }
 
+export async function fetchSong(id: string): Promise<Song> {
+  const data = await getJson<{ song: Song }>(
+    `${apiBase()}/songs/${encodeURIComponent(id)}`,
+  );
+  return data.song;
+}
+
 export async function fetchStatus(): Promise<StatusResponse> {
   return getJson<StatusResponse>(`${apiBase()}/status`);
 }

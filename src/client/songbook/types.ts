@@ -11,6 +11,7 @@ export type SongbookState = {
   artists: string[];
   queue: SongRequest[];
   status: StatusResponse | null;
+  nowPlayingArt: string;
   selectedSong: Song | null;
   submitting: boolean;
   viewMode: ViewMode;
