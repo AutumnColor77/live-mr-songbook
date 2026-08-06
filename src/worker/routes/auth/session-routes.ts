@@ -1,5 +1,4 @@
 import { Hono } from "hono";
-import { ensureDemoMembership } from "../../auth";
 import {
   destroySession,
   loadUserFromSession,
@@ -13,7 +12,6 @@ import {
 } from "./helpers";
 
 async function listChannelsForUser(db: D1Database, userId: string) {
-  await ensureDemoMembership(db, userId);
   const { results } = await db
     .prepare(
       `SELECT c.id, c.slug, c.name, cm.role

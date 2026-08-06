@@ -1,4 +1,5 @@
 import { submitRequest } from "../api";
+import type { AuthUser } from "../auth-api";
 import { $ } from "../dom";
 import type { ToastController } from "../toast";
 import type { RequestGate } from "./request-gate";
@@ -10,6 +11,7 @@ export function openRequestModal(
   gate: RequestGate,
   toast: ToastController,
   songId: string,
+  user: AuthUser | null = null,
 ) {
   const song = state.songs.find((s) => s.id === songId);
   if (!song) return;
@@ -24,7 +26,8 @@ export function openRequestModal(
   state.selectedSong = song;
   $("#modal-song-title").textContent = song.title;
   $("#modal-song-artist").textContent = song.artist;
-  ($("#req-nickname") as HTMLInputElement).value = readStoredNickname();
+  const fromUser = user?.name?.trim() || "";
+  ($("#req-nickname") as HTMLInputElement).value = fromUser || readStoredNickname();
   ($("#req-comment") as HTMLInputElement).value = "";
   $("#request-modal").hidden = false;
 }

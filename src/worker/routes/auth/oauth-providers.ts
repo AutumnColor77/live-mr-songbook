@@ -1,6 +1,5 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
-import { ensureDemoMembership } from "../../auth";
 import { signOAuthState, verifyOAuthState, type OAuthProvider } from "../../crypto";
 import { createSession, setOAuthStateCookie, upsertOAuthUser } from "../../session";
 import type { AppEnv } from "../../types";
@@ -204,8 +203,8 @@ async function finishOAuthLogin(
     });
 
     const sessionToken = await createSession(c, user.id);
-    await ensureDemoMembership(c.env.DB, user.id);
 
+    // Demo admin membership is granted lazily when accessing /c/demo/admin.
     const needsSetup = !user.profile_setup_done;
     const setupPath = `/me/setup?next=${encodeURIComponent(nextPath)}${
       client === "desktop" ? "&client=desktop" : ""
@@ -219,11 +218,10 @@ async function finishOAuthLogin(
       needsSetup,
     });
 
-    if (needsSetup) {
-      if (client === "desktop") {
-        return { ok: true, mode: "desktop-setup", redirect: setupPath };
-      }
-      return { ok: true, mode: "web", redirect: setupPath };
+    // Web: skip forced profile setup so viewers land on next (e.g. /c/:slug).
+    // Desktop Manager still requires setup before handoff.
+    if (needsSetup && client === "desktop") {
+      return { ok: true, mode: "desktop-setup", redirect: setupPath };
     }
 
     if (client === "desktop") {

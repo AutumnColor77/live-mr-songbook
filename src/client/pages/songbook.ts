@@ -4,7 +4,19 @@ import {
   fetchStatus,
   setChannelSlug,
 } from "../api";
-import { $ } from "../dom";
+import { consumeAuthQuery } from "../auth-feedback";
+import {
+  fetchAuthStatus,
+  fetchMe,
+  logout,
+  type AuthUser,
+} from "../auth-api";
+import { $, escapeHtml } from "../dom";
+import {
+  bindLoginPicker,
+  loginButtonHtml,
+  loginPickerOverlayHtml,
+} from "../login-picker";
 import {
   applyFilterPanelOpen,
   applyViewMode,
@@ -31,10 +43,36 @@ import {
 } from "../theme";
 import { createToast } from "../toast";
 
-export async function mountSongbook(root: HTMLElement, slug: string) {
+function authSlotHtml(user: AuthUser | null, providers: { googleEnabled: boolean; naverEnabled: boolean }): string {
+  if (user) {
+    const label = escapeHtml(user.name || user.email || "로그인됨");
+    return `
+      <span class="hidden sm:inline text-xs font-semibold text-dim max-w-[7rem] truncate" title="${label}">${label}</span>
+      <button id="logout-btn" type="button" class="secondary-btn btn-sm">로그아웃</button>
+    `;
+  }
+  return loginButtonHtml(providers, "로그인", "secondary-btn btn-sm");
+}
+
+export async function mountSongbook(
+  root: HTMLElement,
+  slug: string,
+  feedback: { toast?: string } = {},
+) {
   setChannelSlug(slug);
   applyTheme(currentTheme());
-  root.innerHTML = songbookShellHtml();
+
+  const { toast: authToast, errorNotice } = consumeAuthQuery();
+  const [user, authStatus] = await Promise.all([fetchMe(), fetchAuthStatus()]);
+  const providers = {
+    googleEnabled: authStatus.googleEnabled,
+    naverEnabled: authStatus.naverEnabled,
+  };
+
+  root.innerHTML = songbookShellHtml({
+    authSlotHtml: authSlotHtml(user, providers),
+    loginPickerHtml: user ? "" : loginPickerOverlayHtml(providers),
+  });
 
   const state: SongbookState = {
     currentGenre: "ALL",
@@ -53,6 +91,22 @@ export async function mountSongbook(root: HTMLElement, slug: string) {
 
   const toast = createToast(root);
   const gate = createRequestGate(state);
+
+  if (authToast) toast.show(authToast);
+  if (errorNotice) toast.show(errorNotice);
+  if (feedback.toast) toast.show(feedback.toast);
+
+  if (user) {
+    document.querySelector("#logout-btn")?.addEventListener("click", async () => {
+      await logout();
+      await mountSongbook(root, slug, { toast: "로그아웃되었습니다." });
+    });
+  } else {
+    bindLoginPicker({
+      next: `/c/${slug}`,
+      onToast: (msg) => toast.show(msg),
+    });
+  }
 
   async function refreshSongs() {
     try {
@@ -155,7 +209,7 @@ export async function mountSongbook(root: HTMLElement, slug: string) {
     const btn = (e.target as HTMLElement).closest<HTMLButtonElement>(".request-btn");
     if (btn) {
       if (btn.disabled) return;
-      openRequestModal(state, gate, toast, btn.dataset.songId ?? "");
+      openRequestModal(state, gate, toast, btn.dataset.songId ?? "", user);
       return;
     }
     const card = (e.target as HTMLElement).closest<HTMLElement>(".song-card.button-row");
@@ -165,7 +219,7 @@ export async function mountSongbook(root: HTMLElement, slug: string) {
       toast.show(gate.songRequestToast(songId));
       return;
     }
-    openRequestModal(state, gate, toast, songId);
+    openRequestModal(state, gate, toast, songId, user);
   });
 
   $("#song-list").addEventListener("keydown", (e) => {
@@ -198,12 +252,20 @@ export async function mountSongbook(root: HTMLElement, slug: string) {
     toast.show(`${THEME_LABELS[next]} 테마`);
   });
 
-  document.addEventListener("keydown", (e) => {
+  const prev = (root as HTMLElement & { __songbookCleanup?: () => void }).__songbookCleanup;
+  prev?.();
+
+  const onKeyDown = (e: KeyboardEvent) => {
     if (e.key !== "Escape") return;
     closeRequestModal(state);
     queueModal.hidden = true;
-  });
+  };
+  document.addEventListener("keydown", onKeyDown);
 
   await Promise.all([refreshSongs(), refreshQueueAndStatus()]);
-  window.setInterval(() => void refreshQueueAndStatus(), 5000);
+  const pollId = window.setInterval(() => void refreshQueueAndStatus(), 5000);
+  (root as HTMLElement & { __songbookCleanup?: () => void }).__songbookCleanup = () => {
+    document.removeEventListener("keydown", onKeyDown);
+    window.clearInterval(pollId);
+  };
 }

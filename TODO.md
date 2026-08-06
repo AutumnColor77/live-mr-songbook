@@ -6,17 +6,18 @@
 
 - [x] Google OAuth (세션 쿠키, SPA exchange)
 - [x] Naver OAuth
-- [x] 프로필 최초 설정(`/me/setup`)·이후 수정(`/me`)
+- [x] 프로필 설정(`/me/setup` 선택·`/me`에서 수정) — 웹 강제 게이트 없음(데스크톱 Manager는 setup 유지)
 - [x] 아바타 압축 업로드(data URL 상한)
 - [x] 데스크톱 Manager deep-link 로그인·세션 핸드오프
-- [ ] 시청자용 계정 로그인(신청 이력·닉네임 연동 등) — 필요 시
+- [x] 시청자 선택 로그인(`/c/:slug`·랜딩 `?next=` → 노래책 복귀, 닉네임 프리필)
+- [ ] 시청자 신청 이력·`requests.user_id` 연동
 
 ## 2. 채널·권한
 
 - [x] `channel_members` + 세션 기반 채널 admin
 - [x] `/me`에서 채널 생성(계정당 1개, slug 자동/직접)
 - [x] 채널 이름·슬러그 PATCH
-- [x] demo 멤버십 자동 합류(체험용)
+- [x] demo 멤버십 lazy 합류(demo 운영 화면 진입 시)
 - [ ] 채널 멤버 초대·역할 관리(비-demo)
 - [ ] 채널 삭제·이전
 - [ ] 데모와 본채널 UX/권한 분리 점검

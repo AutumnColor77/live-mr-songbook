@@ -96,10 +96,6 @@ async function boot() {
       location.replace("/?auth=error&reason=access_denied");
       return;
     }
-    if (session.user.needsProfileSetup) {
-      location.replace("/me/setup?next=/me");
-      return;
-    }
     await mountAccount(app!, session.user, session.channels, errorNotice, toast);
     return;
   }
@@ -109,10 +105,9 @@ async function boot() {
     const params = new URLSearchParams(location.search);
     const isDesktop = params.get("client") === "desktop";
     const [user, status] = await Promise.all([fetchMe(), fetchAuthStatus()]);
-    if (user?.needsProfileSetup) {
-      const setupQ = new URLSearchParams({ next: "/me" });
-      if (isDesktop) setupQ.set("client", "desktop");
-      location.replace(`/me/setup?${setupQ}`);
+    // Desktop Manager still requires profile setup before handoff.
+    if (isDesktop && user?.needsProfileSetup) {
+      location.replace(`/me/setup?${new URLSearchParams({ next: "/me", client: "desktop" })}`);
       return;
     }
     if (isDesktop && user) {
@@ -135,11 +130,6 @@ async function boot() {
       return;
     }
     if (parsed.admin) {
-      const user = await fetchMe();
-      if (user?.needsProfileSetup) {
-        location.replace(`/me/setup?next=${encodeURIComponent(`/c/${parsed.slug}/admin`)}`);
-        return;
-      }
       await mountAdmin(app!, parsed.slug);
       return;
     }
@@ -148,10 +138,6 @@ async function boot() {
   }
 
   const [user, status] = await Promise.all([fetchMe(), fetchAuthStatus()]);
-  if (user?.needsProfileSetup) {
-    location.replace("/me/setup?next=/me");
-    return;
-  }
   mountLanding(app!, user, { googleEnabled: status.googleEnabled, naverEnabled: status.naverEnabled });
 }
 

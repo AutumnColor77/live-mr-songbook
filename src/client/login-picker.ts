@@ -11,12 +11,13 @@ export type LoginProviders = {
 export function loginButtonHtml(
   providers: LoginProviders,
   label = "내 채널 시작",
+  className = "primary-btn w-full",
 ): string {
   const any = providers.googleEnabled || providers.naverEnabled;
   if (!any) {
-    return `<button type="button" class="primary-btn w-full" disabled>지금은 로그인을 사용할 수 없습니다</button>`;
+    return `<button type="button" class="${className}" disabled>로그인 불가</button>`;
   }
-  return `<button id="login-btn" type="button" class="primary-btn w-full">${escapeHtml(label)}</button>`;
+  return `<button id="login-btn" type="button" class="${className}">${escapeHtml(label)}</button>`;
 }
 
 export function loginPickerOverlayHtml(providers: LoginProviders): string {

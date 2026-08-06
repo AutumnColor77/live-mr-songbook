@@ -1,7 +1,10 @@
 import { icons } from "../icons";
 import { logoLinkHtml } from "../theme";
 
-export function songbookShellHtml(): string {
+export function songbookShellHtml(opts: {
+  authSlotHtml: string;
+  loginPickerHtml: string;
+}): string {
   return `
   <div class="relative z-10 min-h-screen flex flex-col">
     <header class="topbar sticky top-0 z-30">
@@ -17,6 +20,9 @@ export function songbookShellHtml(): string {
             <span class="live-dot"></span>
             <span id="live-pill-text">신청 가능</span>
           </span>
+          <div id="songbook-auth-slot" class="flex items-center gap-2 shrink-0">
+            ${opts.authSlotHtml}
+          </div>
           <button id="theme-btn" type="button" class="icon-btn" title="테마 변경" aria-label="테마 변경">
             ${icons.palette(18)}
           </button>
@@ -147,6 +153,7 @@ export function songbookShellHtml(): string {
       </div>
     </div>
 
+    ${opts.loginPickerHtml}
     <div id="toast" class="toast" hidden></div>
   </div>
 `;
