@@ -63,13 +63,12 @@
 
 ## 7. 치지직 채팅·도네 신청곡
 
-설계: [docs/chzzk-paid-requests.md](docs/chzzk-paid-requests.md)  
+설계: [docs/chzzk-paid-requests.md](docs/chzzk-paid-requests.md) · 실시간 연동: [docs/chzzk-realtime-integration.md](docs/chzzk-realtime-integration.md)  
 방향: 공식 Session **채팅(무료) + 도네(유료)** + `!신청 가수-제목` DB 매칭. 결제 대행은 하지 않음. 짧은 checkout 코드는 쓰지 않음.
 
 - [x] 가격/`request_mode`/`request_command_prefix` 설정·`requests.pay_amount`·`donation_ref`/`chat_message_ref` 스키마
 - [x] 명령 파서 + 곡(artist/title) 매칭 + 시청자 복붙 모달 + 운영 가격·모드 설정
 - [x] (검증용) `chzzk/ingest` 수동·호스트 확인으로 플로우 먼저 검증
-- [ ] 치지직 OAuth 연결(후원·채팅 관련 Scope) + 토큰 보관
-- [ ] ChzzkSessionDO 도네 구독·금액 검증·멱등 처리
-- [ ] ChzzkSessionDO 채팅 구독·무료 명령 매칭
+- [x] 치지직 OAuth 연결(후원·채팅 관련 Scope) + 토큰 보관 — 골격 ([docs/chzzk-realtime-integration.md](docs/chzzk-realtime-integration.md); 앱 시크릿·E2E는 사용자)
+- [x] ChzzkSessionDO 도네·채팅 구독 → ingest — 골격 (실소켓 검증 필요)
 - [ ] 유료 전용 모드·동명곡/하이픈 표기 옵션 등 고도화

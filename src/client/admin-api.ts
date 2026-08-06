@@ -103,3 +103,32 @@ export async function fetchPublicStatus(slug: string): Promise<StatusResponse> {
   }
   return data;
 }
+
+export type ChzzkAdminStatus = {
+  configured: boolean;
+  linked: boolean;
+  chzzkChannelId: string | null;
+  chzzkChannelName: string | null;
+  sessionStatus: string;
+  sessionDetail: string;
+  connectedAt: number | null;
+};
+
+export async function fetchChzzkStatus(slug: string): Promise<ChzzkAdminStatus> {
+  return adminFetch<ChzzkAdminStatus>(slug, "/chzzk");
+}
+
+export async function unlinkChzzk(slug: string): Promise<void> {
+  await adminFetch<{ ok: boolean }>(slug, "/chzzk", { method: "DELETE" });
+}
+
+export async function restartChzzkSession(slug: string): Promise<void> {
+  await adminFetch<{ ok?: boolean }>(slug, "/chzzk/session", {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+}
+
+export function chzzkConnectUrl(slug: string): string {
+  return `${adminBase(slug)}/chzzk/connect`;
+}

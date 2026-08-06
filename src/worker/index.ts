@@ -52,3 +52,4 @@ app.notFound((c) => {
 });
 
 export default app;
+export { ChzzkSessionDO } from "./chzzk-session-do";

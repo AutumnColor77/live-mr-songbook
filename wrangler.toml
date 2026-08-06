@@ -10,6 +10,8 @@ preview_urls = true
 #   npx wrangler secret put GOOGLE_CLIENT_SECRET
 #   npx wrangler secret put NAVER_CLIENT_ID
 #   npx wrangler secret put NAVER_CLIENT_SECRET
+#   npx wrangler secret put CHZZK_CLIENT_ID
+#   npx wrangler secret put CHZZK_CLIENT_SECRET
 # Local: use `.dev.vars` instead.
 
 [[d1_databases]]
@@ -17,6 +19,14 @@ binding = "DB"
 database_name = "live-mr-songbook"
 database_id = "e2842118-6029-41bc-b309-f8e0a1b8bed1"
 migrations_dir = "migrations"
+
+[[durable_objects.bindings]]
+name = "CHZZK_SESSION"
+class_name = "ChzzkSessionDO"
+
+[[migrations]]
+tag = "chzzk-session-v1"
+new_sqlite_classes = ["ChzzkSessionDO"]
 
 [assets]
 not_found_handling = "single-page-application"

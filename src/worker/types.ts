@@ -6,6 +6,9 @@ export type Bindings = {
   GOOGLE_CLIENT_SECRET?: string;
   NAVER_CLIENT_ID?: string;
   NAVER_CLIENT_SECRET?: string;
+  CHZZK_CLIENT_ID?: string;
+  CHZZK_CLIENT_SECRET?: string;
+  CHZZK_SESSION?: DurableObjectNamespace;
 };
 
 export type ChannelRow = {

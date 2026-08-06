@@ -122,22 +122,23 @@ export function songbookShellHtml(opts: {
       <div class="modal-content relative">
         <div class="modal-grip"></div>
         <p class="modal-eyebrow mb-1.5">노래 신청</p>
-        <h2 id="modal-song-title" class="text-lg font-extrabold text-main truncate"></h2>
-        <p id="modal-song-artist" class="text-sm font-medium text-muted truncate mb-5"></p>
+        <div class="flex items-start justify-between gap-3 mb-5">
+          <div class="min-w-0 flex-1">
+            <h2 id="modal-song-title" class="text-lg font-extrabold text-main truncate"></h2>
+            <p id="modal-song-artist" class="text-sm font-medium text-muted truncate"></p>
+          </div>
+          <p id="modal-requester" class="shrink-0 text-sm font-bold text-main text-right max-w-[42%] truncate pt-0.5" title="신청자"></p>
+        </div>
 
         <div id="req-command-panel" class="mb-5 space-y-2">
-          <p id="req-command-hint" class="text-xs font-medium text-muted"></p>
-          <div class="flex gap-2 items-stretch">
-            <code id="req-command-text" class="cm-input flex-1 text-xs font-semibold break-all whitespace-pre-wrap min-h-[2.75rem]"></code>
-            <button id="copy-request-cmd" type="button" class="secondary-btn btn-sm shrink-0 self-start">복사</button>
+          <div id="req-command-hint" class="space-y-1.5 text-xs font-medium text-muted"></div>
+          <div class="flex gap-2 items-center">
+            <code id="req-command-text" class="cm-input flex-1 !h-[38px] min-h-0 flex items-center text-xs font-semibold whitespace-nowrap overflow-x-auto"></code>
+            <button id="copy-request-cmd" type="button" class="secondary-btn btn-sm shrink-0">복사</button>
           </div>
           <p id="req-paid-hint" class="text-xs font-semibold text-accent" hidden></p>
         </div>
 
-        <div id="req-web-fields" class="space-y-3 mb-6">
-          <input id="req-nickname" type="text" maxlength="40" class="cm-input" placeholder="닉네임 (선택)" />
-          <input id="req-comment" type="text" maxlength="200" class="cm-input" placeholder="한마디 (선택)" />
-        </div>
         <div class="flex gap-2.5">
           <button id="close-request-modal" type="button" class="secondary-btn flex-1">취소</button>
           <button id="submit-request-btn" type="button" class="primary-btn flex-1">

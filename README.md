@@ -64,12 +64,26 @@ npx wrangler secret put GOOGLE_CLIENT_ID
 npx wrangler secret put GOOGLE_CLIENT_SECRET
 npx wrangler secret put NAVER_CLIENT_ID
 npx wrangler secret put NAVER_CLIENT_SECRET
+npx wrangler secret put CHZZK_CLIENT_ID
+npx wrangler secret put CHZZK_CLIENT_SECRET
 ```
 
 설정이 비어 있으면 해당 로그인 버튼은 사용할 수 없습니다 (`GET /api/auth/status`).
 
 **데스크톱(Manager)** deep-link: `live-mr-manager://oauth/callback?token=…`  
 브라우저 세션 재사용: `GET /api/auth/desktop-connect`, 핸드오프: `GET /api/auth/desktop-handoff`.
+
+## 치지직 실시간 (채팅·후원)
+
+계획·할 일: [docs/chzzk-realtime-integration.md](docs/chzzk-realtime-integration.md)  
+설계: [docs/chzzk-paid-requests.md](docs/chzzk-paid-requests.md)
+
+1. [개발자 센터](https://developers.chzzk.naver.com/) 앱 등록 · Scope(유저/채팅/후원) · Redirect URI  
+   - 로컬: `http://localhost:5173/api/auth/chzzk/callback`  
+   - 프로덕션: `https://<worker>.workers.dev/api/auth/chzzk/callback`
+2. `.dev.vars` / Workers secrets에 `CHZZK_CLIENT_ID` · `CHZZK_CLIENT_SECRET`
+3. 채널 운영 화면에서 **치지직 연결** → 세션 상태 확인  
+4. `npm run db:migrate:remote` (또는 `deploy:with-migrate`)로 `0015`·`0016` 적용
 
 ## Multi-tenant model
 
