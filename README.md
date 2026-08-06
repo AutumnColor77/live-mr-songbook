@@ -2,7 +2,7 @@
 
 시청자용 멀티채널 노래책 — Cloudflare Workers (Hono) + D1 + Vite/Tailwind.
 
-Live MR Manager와는 **별도 리포**입니다. 스트리머는 소셜 로그인으로 본인 채널을 만들고, Manager 앱에서 라이브러리를 **Push** 동기화합니다. 시청자는 `/c/:slug`에서 비로그인으로 곡을 검색·신청할 수 있고, 선택적으로 로그인하면 같은 노래책으로 바로 복귀합니다(프로필 강제 설정 없음).
+Live MR Manager와는 **별도 리포**입니다. 스트리머는 소셜 로그인으로 본인 채널을 만들고, Manager 앱에서 라이브러리를 **Push** 동기화합니다. 홈(`/`)에서 등록된 노래책 목록을 비로그인으로 둘러볼 수 있고, 시청자 로그인 후 같은 홈으로 복귀합니다. 개별 노래책(`/c/:slug`)에서도 선택 로그인이 가능합니다(프로필 강제 설정 없음).
 
 로드맵·미완 작업은 [`TODO.md`](TODO.md)를 보세요. 치지직 도네·유료 신청 설계는 [`docs/chzzk-paid-requests.md`](docs/chzzk-paid-requests.md).
 
