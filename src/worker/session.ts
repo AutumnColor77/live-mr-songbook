@@ -217,7 +217,7 @@ export async function updateUserProfile(
   if (!name) return null;
 
   const picture = input.picture.trim();
-  if (picture.length > 125_000) return null;
+  if (picture.length > 200_000) return null;
   if (
     picture &&
     !/^https?:\/\//i.test(picture) &&
