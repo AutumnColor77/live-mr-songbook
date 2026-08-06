@@ -13,19 +13,12 @@ import { ingestChzzkRequest } from "./request-ingest";
 import type { Bindings } from "./types";
 
 /**
- * Convert Chzzk session URL to Engine.IO websocket URL (Socket.IO 2.x / EIO3).
- * `new WebSocket()` wants ws(s)://; fetch Upgrade wants http(s)://.
+ * Convert Chzzk session URL to Engine.IO websocket upgrade URL (Socket.IO 2.x / EIO3).
+ * Workers fetch() requires http(s):// even for Upgrade: websocket — runtime maps to ws(s).
  */
-function toEngineIoUrl(sessionUrl: string, forFetchUpgrade: boolean): string {
+function toEngineIoHttpsUrl(sessionUrl: string): string {
   const u = new URL(sessionUrl);
-  const secure = u.protocol !== "http:" && u.protocol !== "ws:";
-  const proto = forFetchUpgrade
-    ? secure
-      ? "https:"
-      : "http:"
-    : secure
-      ? "wss:"
-      : "ws:";
+  const proto = u.protocol === "http:" || u.protocol === "ws:" ? "http:" : "https:";
   const q = new URLSearchParams({
     EIO: "3",
     transport: "websocket",
@@ -235,30 +228,25 @@ export class ChzzkSessionDO extends DurableObject<Bindings> {
     }
   }
 
-  private bindSocket(ws: WebSocket, alreadyAccepted = false) {
+  private bindSocket(ws: WebSocket) {
     this.socket = ws;
 
+    // Listeners MUST be registered before accept() or the first Engine.IO
+    // open / SYSTEM packets can be missed.
     ws.addEventListener("message", (event) => {
       void this.onSocketMessage(ws, event.data as string | ArrayBuffer | Blob);
     });
-    ws.addEventListener("close", () => {
+    ws.addEventListener("close", (event) => {
       if (this.socket === ws) this.socket = null;
       this.clearPing();
-      void this.onSocketClose();
+      void this.onSocketClose(event.code, event.reason);
     });
     ws.addEventListener("error", () => {
       if (this.socket === ws) this.socket = null;
       this.clearPing();
       void this.onSocketError();
     });
-    if (!alreadyAccepted && typeof (ws as WebSocket & { accept?: () => void }).accept === "function") {
-      // fetch()-upgrade sockets need accept(); new WebSocket() does not.
-      try {
-        (ws as WebSocket & { accept: () => void }).accept();
-      } catch {
-        /* already accepted / client socket */
-      }
-    }
+    ws.accept();
   }
 
   private async startSession(): Promise<void> {
@@ -267,37 +255,30 @@ export class ChzzkSessionDO extends DurableObject<Bindings> {
     try {
       this.closeSocket("restart");
       this.sessionKey = "";
-      await this.setStatus("connecting", "");
+      await this.setStatus("connecting", "starting");
       const token = await this.ensureFreshToken();
       const sessionUrl = await createUserSessionUrl(token);
-      const wssUrl = toEngineIoUrl(sessionUrl, false);
+      const wsUrl = toEngineIoHttpsUrl(sessionUrl);
 
-      const ws = new WebSocket(wssUrl);
-      this.bindSocket(ws, true);
-
-      await new Promise<void>((resolve, reject) => {
-        if (ws.readyState === WebSocket.OPEN) {
-          resolve();
-          return;
-        }
-        if (ws.readyState === WebSocket.CLOSED || ws.readyState === WebSocket.CLOSING) {
-          reject(new Error("WebSocket closed before open"));
-          return;
-        }
-        const timer = setTimeout(() => reject(new Error("WebSocket open timeout")), 12_000);
-        const onOpen = () => {
-          clearTimeout(timer);
-          resolve();
-        };
-        const onErr = () => {
-          clearTimeout(timer);
-          reject(new Error("WebSocket open failed"));
-        };
-        ws.addEventListener("open", onOpen, { once: true });
-        ws.addEventListener("error", onErr, { once: true });
+      const res = await fetch(wsUrl, {
+        headers: { Upgrade: "websocket" },
       });
+      const ws = res.webSocket;
+      if (!ws) {
+        throw new Error(`WebSocket upgrade failed (${res.status})`);
+      }
+      this.bindSocket(ws);
+      await this.setStatus("connecting", `upgraded ${new URL(wsUrl).host}`);
 
-      await this.setStatus("connecting", `open ${new URL(wssUrl).host}`);
+      // Keep this DO invocation alive until the outbound socket closes.
+      this.ctx.waitUntil(
+        new Promise<void>((resolve) => {
+          const done = () => resolve();
+          ws.addEventListener("close", done, { once: true });
+          ws.addEventListener("error", done, { once: true });
+        }),
+      );
+
       this.ctx.storage.setAlarm(Date.now() + 20_000);
     } finally {
       this.connecting = false;
@@ -374,11 +355,14 @@ export class ChzzkSessionDO extends DurableObject<Bindings> {
     }
   }
 
-  private async onSocketClose() {
+  private async onSocketClose(code = 0, reason = "") {
     this.channelId =
       (await this.ctx.storage.get<string>("channelId")) ?? this.channelId;
     if (this.channelId) {
-      await this.setStatus("disconnected", "socket closed");
+      const detail = reason
+        ? `socket closed ${code} ${reason}`.slice(0, 200)
+        : `socket closed ${code}`;
+      await this.setStatus("disconnected", detail);
       this.ctx.storage.setAlarm(Date.now() + 15_000);
     }
   }

@@ -394,7 +394,6 @@ export async function mountDashboard(
     try {
       await restartChzzkSession(slug);
       toast.show("치지직 세션을 재시작했습니다.");
-      await refresh();
     } catch (err) {
       if (err instanceof AdminAuthError) {
         mountLogin(root, slug, "세션이 만료되었습니다. 다시 로그인해 주세요.");
@@ -403,6 +402,7 @@ export async function mountDashboard(
       toast.show(err instanceof Error ? err.message : "세션 재시작 실패");
     } finally {
       busy = false;
+      await refresh().catch(() => undefined);
     }
   });
 
