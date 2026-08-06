@@ -77,7 +77,7 @@ export function mountLanding(
           id: "login-viewer",
           next: "/",
         })}
-        ${loginButtonHtml(providers, "내 채널 시작", {
+        ${loginButtonHtml(providers, "스트리머로 로그인", {
           className: "secondary-btn flex-1",
           id: "login-streamer",
           next: "/me",

@@ -17,7 +17,7 @@ type LoginButtonOpts = {
 /** Login trigger button. Use `next` when multiple triggers share one picker. */
 export function loginButtonHtml(
   providers: LoginProviders,
-  label = "내 채널 시작",
+  label = "스트리머로 로그인",
   classNameOrOpts: string | LoginButtonOpts = "primary-btn w-full",
 ): string {
   const opts: LoginButtonOpts =
