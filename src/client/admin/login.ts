@@ -56,7 +56,7 @@ export function mountLogin(
                  <button id="admin-logout" type="button" class="secondary-btn w-full">다른 계정으로</button></div>`
               : ""
           }
-          ${user ? "" : loginButtonHtml(providers, "로그인")}
+          ${user ? "" : loginButtonHtml(providers, "로그인", { next: `/c/${slug}/admin` })}
           <p class="text-xs text-dim leading-relaxed">
             ${user ? "이 채널의 운영 멤버만 대기열을 관리할 수 있습니다." : "로그인하면 대기열을 관리할 수 있습니다."}
           </p>

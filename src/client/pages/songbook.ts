@@ -43,15 +43,31 @@ import {
 } from "../theme";
 import { createToast } from "../toast";
 
-function authSlotHtml(user: AuthUser | null, providers: { googleEnabled: boolean; naverEnabled: boolean }): string {
+function authSlotHtml(
+  user: AuthUser | null,
+  providers: { googleEnabled: boolean; naverEnabled: boolean },
+  slug: string,
+): string {
   if (user) {
     const label = escapeHtml(user.name || user.email || "로그인됨");
     return `
       <span class="hidden sm:inline text-xs font-semibold text-dim max-w-[7rem] truncate" title="${label}">${label}</span>
+      <a href="/c/${escapeHtml(slug)}/admin" class="secondary-btn btn-sm hidden sm:inline-flex">운영</a>
       <button id="logout-btn" type="button" class="secondary-btn btn-sm">로그아웃</button>
     `;
   }
-  return loginButtonHtml(providers, "로그인", "secondary-btn btn-sm");
+  return `
+    ${loginButtonHtml(providers, "로그인", {
+      className: "secondary-btn btn-sm",
+      id: "login-viewer",
+      next: `/c/${slug}`,
+    })}
+    ${loginButtonHtml(providers, "운영", {
+      className: "secondary-btn btn-sm",
+      id: "login-admin",
+      next: `/c/${slug}/admin`,
+    })}
+  `;
 }
 
 export async function mountSongbook(
@@ -70,7 +86,7 @@ export async function mountSongbook(
   };
 
   root.innerHTML = songbookShellHtml({
-    authSlotHtml: authSlotHtml(user, providers),
+    authSlotHtml: authSlotHtml(user, providers, slug),
     loginPickerHtml: user ? "" : loginPickerOverlayHtml(providers),
   });
 

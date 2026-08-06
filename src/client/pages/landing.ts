@@ -1,4 +1,3 @@
-import { safeNextPath } from "../auth-feedback";
 import { logout, type AuthUser } from "../auth-api";
 import { $, escapeHtml } from "../dom";
 import { icons } from "../icons";
@@ -10,9 +9,7 @@ import {
 import { applyTheme, currentTheme, cycleTheme, logoLinkHtml } from "../theme";
 import { createToast } from "../toast";
 
-function isSongbookNext(path: string): boolean {
-  return /^\/c\/[^/]+\/?$/i.test(path);
-}
+const VIEWER_DEMO_NEXT = "/c/demo";
 
 export function mountLanding(
   root: HTMLElement,
@@ -26,22 +23,26 @@ export function mountLanding(
   applyTheme(currentTheme());
   const toast = createToast(root);
 
-  const loginNext = safeNextPath("/me") || "/me";
-  const viewerLogin = isSongbookNext(loginNext);
-  const loginLabel = viewerLogin ? "로그인" : "내 채널 시작";
-  const loginHint = viewerLogin
-    ? "로그인하면 노래책으로 바로 돌아갑니다. 신청은 비로그인으로도 가능합니다."
-    : "로그인하면 내 노래책을 만들고 운영할 수 있습니다.";
-
   const authBlock = user
-    ? viewerLogin
-      ? `<a href="${escapeHtml(loginNext)}" class="primary-btn w-full">노래책으로</a>
-         <a href="/me" class="secondary-btn w-full">내 채널</a>`
-      : `<a href="/me" class="primary-btn w-full">내 채널로</a>`
+    ? `
+      <a href="/me" class="primary-btn w-full">내 채널로</a>
+      <a href="${VIEWER_DEMO_NEXT}" class="secondary-btn w-full">데모 노래책</a>
+    `
     : `
-      ${loginButtonHtml(providers, loginLabel)}
+      <div class="space-y-2.5">
+        ${loginButtonHtml(providers, "내 채널 시작", {
+          className: "primary-btn w-full",
+          id: "login-streamer",
+          next: "/me",
+        })}
+        ${loginButtonHtml(providers, "시청자로 로그인", {
+          className: "secondary-btn w-full",
+          id: "login-viewer",
+          next: VIEWER_DEMO_NEXT,
+        })}
+      </div>
       <p class="text-xs text-dim text-center leading-relaxed">
-        ${escapeHtml(loginHint)}
+        스트리머는 내 채널을, 시청자는 데모 노래책으로 바로 이동합니다.
       </p>
     `;
 
@@ -95,7 +96,7 @@ export function mountLanding(
     });
   }
 
-  bindLoginPicker({ next: loginNext, onToast: (msg) => toast.show(msg) });
+  bindLoginPicker({ next: "/me", onToast: (msg) => toast.show(msg) });
 
   if (feedback.toast) {
     toast.show(feedback.toast);

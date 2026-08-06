@@ -7,17 +7,33 @@ export type LoginProviders = {
   naverEnabled: boolean;
 };
 
-/** Single "로그인" button + provider picker modal. */
+type LoginButtonOpts = {
+  className?: string;
+  id?: string;
+  /** OAuth 완료 후 이동 경로. bindLoginPicker가 data-login-next로 읽음 */
+  next?: string;
+};
+
+/** Login trigger button. Use `next` when multiple triggers share one picker. */
 export function loginButtonHtml(
   providers: LoginProviders,
   label = "내 채널 시작",
-  className = "primary-btn w-full",
+  classNameOrOpts: string | LoginButtonOpts = "primary-btn w-full",
 ): string {
+  const opts: LoginButtonOpts =
+    typeof classNameOrOpts === "string"
+      ? { className: classNameOrOpts }
+      : classNameOrOpts;
+  const className = opts.className ?? "primary-btn w-full";
+  const idAttr = opts.id ? ` id="${escapeHtml(opts.id)}"` : "";
+  const nextAttr = opts.next
+    ? ` data-login-next="${escapeHtml(opts.next)}"`
+    : "";
   const any = providers.googleEnabled || providers.naverEnabled;
   if (!any) {
     return `<button type="button" class="${className}" disabled>로그인 불가</button>`;
   }
-  return `<button id="login-btn" type="button" class="${className}">${escapeHtml(label)}</button>`;
+  return `<button type="button"${idAttr}${nextAttr} class="login-trigger ${className}">${escapeHtml(label)}</button>`;
 }
 
 export function loginPickerOverlayHtml(providers: LoginProviders): string {
@@ -49,21 +65,37 @@ export function loginPickerOverlayHtml(providers: LoginProviders): string {
 }
 
 export function bindLoginPicker(opts: {
-  next: string;
+  /** Used when a trigger has no data-login-next */
+  next?: string;
   onToast?: (msg: string) => void;
 }): void {
   const overlay = document.querySelector<HTMLElement>("#login-picker");
-  const openBtn = document.querySelector<HTMLButtonElement>("#login-btn");
-  if (!overlay || !openBtn) return;
+  if (!overlay) return;
+
+  const triggers = [
+    ...document.querySelectorAll<HTMLButtonElement>(".login-trigger"),
+    ...document.querySelectorAll<HTMLButtonElement>("#login-btn"),
+  ];
+  // Deduplicate if a button has both id and class
+  const uniqueTriggers = [...new Set(triggers)];
+  if (uniqueTriggers.length === 0) return;
+
+  let pendingNext = opts.next || "/me";
 
   const close = () => {
     overlay.hidden = true;
   };
-  const open = () => {
+  const open = (next: string) => {
+    pendingNext = next;
     overlay.hidden = false;
   };
 
-  openBtn.addEventListener("click", open);
+  for (const openBtn of uniqueTriggers) {
+    openBtn.addEventListener("click", () => {
+      open(openBtn.dataset.loginNext || opts.next || "/me");
+    });
+  }
+
   overlay.querySelector("#login-picker-close")?.addEventListener("click", close);
   overlay.addEventListener("click", (e) => {
     if (e.target === overlay) close();
@@ -75,15 +107,19 @@ export function bindLoginPicker(opts: {
       if (!provider) return;
       const label = provider === "naver" ? "네이버" : "Google";
       btn.disabled = true;
-      openBtn.disabled = true;
+      uniqueTriggers.forEach((t) => {
+        t.disabled = true;
+      });
       opts.onToast?.(`${label} 로그인으로 이동 중…`);
       try {
-        const url = await startOAuthLogin(provider, opts.next);
+        const url = await startOAuthLogin(provider, pendingNext);
         window.location.assign(url);
       } catch (err) {
         opts.onToast?.(err instanceof Error ? err.message : "로그인 시작에 실패했습니다.");
         btn.disabled = false;
-        openBtn.disabled = false;
+        uniqueTriggers.forEach((t) => {
+          t.disabled = false;
+        });
       }
     });
   });
