@@ -12,10 +12,13 @@ import {
 import { ingestChzzkRequest } from "./request-ingest";
 import type { Bindings } from "./types";
 
-/** Convert Chzzk session HTTPS URL to Engine.IO websocket URL (Socket.IO 2.x / EIO3). */
+/**
+ * Convert Chzzk session URL to Engine.IO websocket upgrade URL (Socket.IO 2.x / EIO3).
+ * Workers fetch() requires http(s):// even for Upgrade: websocket — runtime maps to ws(s).
+ */
 function toEngineIoWsUrl(sessionUrl: string): string {
   const u = new URL(sessionUrl);
-  const proto = u.protocol === "https:" ? "wss:" : "ws:";
+  const proto = u.protocol === "http:" ? "http:" : "https:";
   const q = new URLSearchParams({
     EIO: "3",
     transport: "websocket",
