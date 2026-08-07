@@ -10,7 +10,13 @@ import {
   loginButtonHtml,
   loginPickerOverlayHtml,
 } from "../login-picker";
-import { applyTheme, currentTheme, cycleTheme, logoLinkHtml } from "../theme";
+import {
+  applyTheme,
+  currentTheme,
+  cycleTheme,
+  heroLogoHtml,
+  logoLinkHtml,
+} from "../theme";
 import { createToast } from "../toast";
 
 function channelCardHtml(ch: DirectoryChannel): string {
@@ -65,13 +71,13 @@ export function mountLanding(
 
   const authBlock = user
     ? `
-      <div class="flex flex-col sm:flex-row gap-2.5">
+      <div class="landing-hero-cta flex flex-col sm:flex-row gap-2.5 w-full max-w-md mx-auto">
         <a href="#directory" class="primary-btn flex-1 text-center">노래책 둘러보기</a>
         <a href="/me" class="secondary-btn flex-1 text-center">내 채널</a>
       </div>
     `
     : `
-      <div class="flex flex-col sm:flex-row gap-2.5">
+      <div class="landing-hero-cta flex flex-col sm:flex-row gap-2.5 w-full max-w-md mx-auto">
         ${loginButtonHtml(providers, "시청자로 로그인", {
           className: "primary-btn flex-1",
           id: "login-viewer",
@@ -83,7 +89,7 @@ export function mountLanding(
           next: "/me",
         })}
       </div>
-      <p class="text-xs text-dim text-center leading-relaxed">
+      <p class="landing-hero-note text-xs text-dim text-center leading-relaxed">
         로그인 없이도 아래 노래책을 둘러보고 신청할 수 있어요.
       </p>
     `;
@@ -106,44 +112,55 @@ export function mountLanding(
           </div>
         </div>
       </header>
-      <main class="flex-1 w-full max-w-3xl mx-auto px-4 sm:px-6 py-10 space-y-8">
-        <section class="panel p-8 text-center space-y-5">
-          <div>
-            <h1 class="text-xl font-extrabold text-main mb-2">Live MR Songbook</h1>
-            <p class="text-sm font-medium text-muted">
-              스트리머 노래책을 찾고, 방송 중 바로 신청하세요.
-            </p>
+      <main class="flex-1 w-full">
+        <section class="landing-hero" aria-label="소개">
+          <div class="landing-hero-stage" aria-hidden="true"></div>
+          <div class="landing-hero-inner">
+            <div class="landing-hero-brand">
+              ${heroLogoHtml({ fetchpriority: true })}
+            </div>
+            <div class="landing-hero-copy">
+              <h1 class="landing-hero-title">방송 중, 바로 신청</h1>
+              <p class="landing-hero-support">
+                스트리머 노래책을 찾고 원하는 곡을 신청하세요.
+              </p>
+            </div>
+            ${
+              feedback.errorNotice
+                ? `<p class="landing-hero-error text-sm font-semibold" style="color:#f87171">${escapeHtml(feedback.errorNotice)}</p>`
+                : ""
+            }
+            ${authBlock}
+            <a href="#directory" class="landing-hero-scroll" aria-label="노래책 목록으로 이동">
+              ${icons.chevronDown(22)}
+            </a>
           </div>
-          ${
-            feedback.errorNotice
-              ? `<p class="text-sm font-semibold" style="color:#f87171">${escapeHtml(feedback.errorNotice)}</p>`
-              : ""
-          }
-          ${authBlock}
         </section>
 
-        <section id="directory" class="panel p-6 space-y-4 scroll-mt-24">
-          <div class="flex items-end justify-between gap-3">
-            <div class="text-left">
-              <h2 class="text-sm font-extrabold text-main">노래책 찾기</h2>
-              <p class="text-xs text-dim mt-0.5">등록된 스트리머 노래책 목록입니다.</p>
+        <div class="w-full max-w-3xl mx-auto px-4 sm:px-6 pb-12 pt-2">
+          <section id="directory" class="panel p-6 space-y-4 scroll-mt-24">
+            <div class="flex items-end justify-between gap-3">
+              <div class="text-left">
+                <h2 class="text-sm font-extrabold text-main">노래책 찾기</h2>
+                <p class="text-xs text-dim mt-0.5">등록된 스트리머 노래책 목록입니다.</p>
+              </div>
+              <span id="directory-count" class="text-xs font-semibold text-dim shrink-0"></span>
             </div>
-            <span id="directory-count" class="text-xs font-semibold text-dim shrink-0"></span>
-          </div>
-          <div class="search-box">
-            ${icons.search(18)}
-            <input
-              id="directory-search"
-              type="search"
-              class="search-input"
-              autocomplete="off"
-              placeholder="이름 또는 주소 검색..."
-            />
-          </div>
-          <div id="directory-list" class="flex flex-wrap gap-3 justify-start">
-            <p class="text-sm text-dim text-center py-6 w-full">불러오는 중…</p>
-          </div>
-        </section>
+            <div class="search-box">
+              ${icons.search(18)}
+              <input
+                id="directory-search"
+                type="search"
+                class="search-input"
+                autocomplete="off"
+                placeholder="이름 또는 주소 검색..."
+              />
+            </div>
+            <div id="directory-list" class="flex flex-wrap gap-3 justify-start">
+              <p class="text-sm text-dim text-center py-6 w-full">불러오는 중…</p>
+            </div>
+          </section>
+        </div>
       </main>
       ${loginPickerOverlayHtml(providers)}
       <div id="toast" class="toast" hidden></div>

@@ -6,7 +6,8 @@ export function songbookShellHtml(opts: {
   loginPickerHtml: string;
 }): string {
   return `
-  <div class="relative z-10 min-h-screen flex flex-col">
+  <div class="songbook-page relative z-10 min-h-screen flex flex-col">
+    <div class="songbook-stage" aria-hidden="true"></div>
     <header class="topbar sticky top-0 z-30">
       <div class="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
         <div class="flex items-center gap-3 min-w-0">
@@ -30,9 +31,9 @@ export function songbookShellHtml(opts: {
       </div>
     </header>
 
-    <main class="flex-1 w-full max-w-6xl mx-auto px-4 sm:px-6 py-5 pb-32 lg:pb-8">
+    <main class="songbook-main flex-1 w-full max-w-6xl mx-auto px-4 sm:px-6 py-5 pb-32 lg:pb-8">
       <div class="lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-6 lg:items-start">
-        <section class="space-y-4">
+        <section class="songbook-explore space-y-4">
           <div class="search-box">
             ${icons.search(18)}
             <input
@@ -68,7 +69,7 @@ export function songbookShellHtml(opts: {
             </section>
           </div>
 
-          <div class="flex items-center justify-between gap-3 px-1 text-xs font-semibold">
+          <div class="songbook-list-head flex items-center justify-between gap-3 text-xs font-semibold">
             <span class="text-dim">
               등록곡 <span id="song-count" class="text-main font-extrabold">0</span>곡
             </span>
@@ -81,8 +82,8 @@ export function songbookShellHtml(opts: {
           <div id="song-list" class="song-list list-mode"></div>
         </section>
 
-        <aside class="hidden lg:block sticky top-24">
-          <div class="panel p-5">
+        <aside class="songbook-aside-wrap hidden lg:block sticky top-24">
+          <div class="songbook-aside panel p-5">
             <div class="flex items-center gap-3 pb-4 mb-4 border-b border-glass-border">
               <span id="aside-now-playing-art" class="dock-art">${icons.disc(22)}</span>
               <div class="min-w-0">
@@ -100,7 +101,7 @@ export function songbookShellHtml(opts: {
       </div>
     </main>
 
-    <div class="dock lg:hidden fixed bottom-0 inset-x-0 z-30 pb-[env(safe-area-inset-bottom)]">
+    <div class="dock songbook-dock lg:hidden fixed bottom-0 inset-x-0 z-30 pb-[env(safe-area-inset-bottom)]">
       <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
         <div class="flex items-center gap-3 min-w-0">
           <span id="now-playing-art" class="dock-art">${icons.disc(20)}</span>

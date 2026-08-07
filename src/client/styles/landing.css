@@ -1,0 +1,196 @@
+/* Home landing hero — stage / broadcast atmosphere (scoped to .landing-hero) */
+
+.landing-hero {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100dvh - 4rem);
+  width: 100%;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.landing-hero-stage {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      ellipse 90% 55% at 50% -5%,
+      color-mix(in srgb, var(--accent-primary) 28%, transparent) 0%,
+      transparent 58%
+    ),
+    radial-gradient(
+      ellipse 70% 45% at 50% 100%,
+      color-mix(in srgb, var(--accent-secondary) 14%, transparent) 0%,
+      transparent 55%
+    ),
+    radial-gradient(
+      ellipse 120% 80% at 50% 45%,
+      transparent 40%,
+      color-mix(in srgb, var(--bg-color) 72%, #000) 100%
+    ),
+    var(--bg-color);
+}
+
+.landing-hero-stage::before,
+.landing-hero-stage::after {
+  content: "";
+  position: absolute;
+  top: -15%;
+  width: 38%;
+  height: 130%;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--accent-primary) 22%, transparent) 0%,
+    color-mix(in srgb, var(--accent-primary) 6%, transparent) 45%,
+    transparent 78%
+  );
+  filter: blur(28px);
+  opacity: 0.55;
+  transform-origin: top center;
+  animation: landingSpotDrift 14s ease-in-out infinite alternate;
+}
+
+.landing-hero-stage::before {
+  left: 8%;
+  transform: rotate(14deg);
+}
+
+.landing-hero-stage::after {
+  right: 8%;
+  left: auto;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--accent-secondary) 18%, transparent) 0%,
+    color-mix(in srgb, var(--accent-secondary) 5%, transparent) 42%,
+    transparent 78%
+  );
+  transform: rotate(-12deg);
+  animation-delay: -4s;
+  animation-duration: 18s;
+}
+
+.landing-hero-inner {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 1.25rem;
+  width: 100%;
+  max-width: 36rem;
+  padding: 2.5rem 1.25rem 3.5rem;
+}
+
+.landing-hero-brand {
+  animation: landingRise 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.landing-hero-logo {
+  height: clamp(48px, 10vw, 72px);
+  width: auto;
+  aspect-ratio: 4 / 1;
+  display: block;
+  margin: 0 auto;
+  filter: drop-shadow(0 8px 28px color-mix(in srgb, var(--accent-primary) 35%, transparent));
+}
+
+.landing-hero-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  animation: landingRise 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.12s both;
+}
+
+.landing-hero-title {
+  margin: 0;
+  font-size: clamp(1.35rem, 4.2vw, 1.85rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  color: var(--text-main);
+}
+
+.landing-hero-support {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  line-height: 1.55;
+  color: var(--text-muted);
+  max-width: 22rem;
+  margin-inline: auto;
+}
+
+.landing-hero-cta,
+.landing-hero-note,
+.landing-hero-error {
+  animation: landingRise 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.24s both;
+}
+
+.landing-hero-note {
+  margin: 0;
+  max-width: 20rem;
+}
+
+.landing-hero-scroll {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 0.75rem;
+  color: var(--text-dim);
+  opacity: 0.75;
+  transition: color 0.2s ease, opacity 0.2s ease;
+  animation:
+    landingRise 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.36s both,
+    landingScrollHint 2.2s ease-in-out 1s infinite;
+}
+
+.landing-hero-scroll:hover {
+  color: var(--text-muted);
+  opacity: 1;
+}
+
+@keyframes landingRise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes landingSpotDrift {
+  from {
+    opacity: 0.4;
+    filter: blur(28px);
+  }
+  to {
+    opacity: 0.7;
+    filter: blur(36px);
+  }
+}
+
+@keyframes landingScrollHint {
+  0%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.55;
+  }
+  50% {
+    transform: translateY(6px);
+    opacity: 0.9;
+  }
+}
+
+@media (min-width: 640px) {
+  .landing-hero-inner {
+    gap: 1.5rem;
+    padding: 3rem 1.5rem 4rem;
+  }
+}

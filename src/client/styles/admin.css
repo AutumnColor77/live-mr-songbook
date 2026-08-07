@@ -63,3 +63,217 @@
   background: #fff;
 }
 
+/* --- Admin ops dashboard (stage / broadcast atmosphere) --- */
+.admin-ops {
+  position: relative;
+  isolation: isolate;
+}
+
+.admin-ops-stage {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      ellipse 80% 50% at 50% -8%,
+      color-mix(in srgb, var(--accent-primary) 22%, transparent) 0%,
+      transparent 55%
+    ),
+    radial-gradient(
+      ellipse 55% 40% at 100% 30%,
+      color-mix(in srgb, var(--accent-secondary) 10%, transparent) 0%,
+      transparent 60%
+    ),
+    radial-gradient(
+      ellipse 100% 70% at 50% 60%,
+      transparent 35%,
+      color-mix(in srgb, var(--bg-color) 78%, #000) 100%
+    );
+  animation: adminOpsGlow 16s ease-in-out infinite alternate;
+}
+
+.admin-ops > :not(.admin-ops-stage) {
+  position: relative;
+  z-index: 1;
+}
+
+.admin-ops-main {
+  animation: adminOpsRise 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.admin-ops-notice {
+  color: var(--ok-text);
+}
+
+.admin-ops-status {
+  display: grid;
+  gap: 0.75rem;
+}
+
+@media (min-width: 640px) {
+  .admin-ops-status {
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    gap: 0.875rem;
+  }
+}
+
+.admin-ops-card {
+  border: 1px solid var(--glass-border);
+  background: color-mix(in srgb, var(--glass-bg) 88%, transparent);
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+  border-radius: 18px;
+  box-shadow: 0 10px 36px rgb(0 0 0 / 0.12);
+}
+
+.admin-ops-accepting {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1rem 1.1rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.admin-ops-accepting.is-open {
+  border-color: color-mix(in srgb, var(--ok-text) 35%, var(--glass-border));
+  box-shadow:
+    0 10px 36px rgb(0 0 0 / 0.12),
+    0 0 0 1px color-mix(in srgb, var(--ok-text) 12%, transparent);
+}
+
+.admin-ops-accepting.is-closed {
+  border-color: var(--glass-border);
+  opacity: 0.92;
+}
+
+.admin-ops-kicker {
+  margin: 0 0 0.2rem;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.admin-ops-accepting-label {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--text-main);
+}
+
+.admin-ops-accepting.is-open .admin-ops-accepting-label {
+  color: var(--ok-text);
+}
+
+.admin-ops-now {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 1rem 1.1rem;
+}
+
+.admin-ops-now-art {
+  flex-shrink: 0;
+}
+
+.admin-ops-queue {
+  padding: 1.15rem 1.15rem 1.25rem;
+}
+
+.admin-ops-queue-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.35rem 1rem;
+  margin-bottom: 0.85rem;
+}
+
+.admin-ops-queue-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text-main);
+}
+
+.admin-ops-queue-hint {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+
+.admin-ops-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  padding: 0.65rem 0.7rem;
+  border-radius: 14px;
+  border: 1px solid var(--glass-border);
+  background: var(--surface-1);
+}
+
+.admin-ops-toolbar .dup-past-switch {
+  margin-right: auto;
+}
+
+.admin-ops-queue-list {
+  min-height: 4rem;
+}
+
+.admin-ops-empty {
+  padding: 2.5rem 1rem;
+  text-align: center;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  border-radius: 12px;
+  border: 1px dashed var(--glass-border);
+  background: var(--surface-1);
+}
+
+.admin-ops-row.is-playing {
+  border-color: color-mix(in srgb, var(--accent-primary) 45%, var(--glass-border));
+  background: color-mix(in srgb, var(--accent-primary) 10%, var(--surface-2));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent-primary) 18%, transparent);
+}
+
+@keyframes adminOpsGlow {
+  from {
+    opacity: 0.85;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes adminOpsRise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 639px) {
+  .admin-ops-toolbar .dup-past-switch {
+    margin-right: 0;
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .admin-ops-toolbar #dup-toggle,
+  .admin-ops-toolbar #queue-clear {
+    flex: 1 1 calc(50% - 0.25rem);
+  }
+}

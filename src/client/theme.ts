@@ -22,14 +22,26 @@ export function logoSrc(theme: Theme): string {
 export function logoLinkHtml(options?: { fetchpriority?: boolean }): string {
   const fetchpriority = options?.fetchpriority ? ' fetchpriority="high"' : "";
   return `<a href="/" class="min-w-0 shrink-0 block">
-    <img id="logo-lockup" class="logo-lockup" src="${logoSrc(currentTheme())}" width="480" height="120" alt="Live MR Songbook 홈"${fetchpriority} />
+    <img class="logo-lockup" src="${logoSrc(currentTheme())}" width="480" height="120" alt="Live MR Songbook 홈"${fetchpriority} />
   </a>`;
+}
+
+/** Hero-scale wordmark (same theme swap as topbar via .logo-lockup). */
+export function heroLogoHtml(options?: { fetchpriority?: boolean }): string {
+  const fetchpriority = options?.fetchpriority ? ' fetchpriority="high"' : "";
+  return `<img
+    class="logo-lockup landing-hero-logo"
+    src="${logoSrc(currentTheme())}"
+    width="480"
+    height="120"
+    alt="Live MR Songbook"${fetchpriority}
+  />`;
 }
 
 export function applyTheme(theme: Theme) {
   document.documentElement.dataset.theme = theme;
   localStorage.setItem(THEME_STORAGE_KEY, theme);
-  document.querySelectorAll<HTMLImageElement>("#logo-lockup").forEach((logo) => {
+  document.querySelectorAll<HTMLImageElement>(".logo-lockup").forEach((logo) => {
     logo.src = logoSrc(theme);
   });
 }

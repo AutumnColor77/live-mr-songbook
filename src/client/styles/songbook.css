@@ -630,3 +630,115 @@
   white-space: nowrap;
 }
 
+/* --- Songbook page: stage / glass hierarchy (scoped) --- */
+.songbook-page {
+  position: relative;
+  isolation: isolate;
+}
+
+.songbook-stage {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      ellipse 85% 48% at 50% -10%,
+      color-mix(in srgb, var(--accent-primary) 20%, transparent) 0%,
+      transparent 55%
+    ),
+    radial-gradient(
+      ellipse 50% 42% at 0% 40%,
+      color-mix(in srgb, var(--accent-secondary) 10%, transparent) 0%,
+      transparent 58%
+    ),
+    radial-gradient(
+      ellipse 100% 70% at 50% 55%,
+      transparent 38%,
+      color-mix(in srgb, var(--bg-color) 80%, #000) 100%
+    );
+  animation: songbookStageGlow 16s ease-in-out infinite alternate;
+}
+
+.songbook-page > :not(.songbook-stage) {
+  position: relative;
+  z-index: 1;
+}
+
+.songbook-main {
+  animation: songbookRise 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.songbook-explore {
+  padding: 1.05rem 1.1rem 1.2rem;
+  border: 1px solid var(--glass-border);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--glass-bg) 88%, transparent);
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+  box-shadow: 0 10px 36px rgb(0 0 0 / 0.12);
+}
+
+.songbook-explore .search-box {
+  background: var(--surface-1);
+}
+
+.songbook-list-head {
+  padding: 0.15rem 0.15rem 0;
+  margin-top: 0.15rem;
+}
+
+.songbook-aside {
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--glass-bg) 90%, transparent);
+  box-shadow: 0 10px 36px rgb(0 0 0 / 0.12);
+}
+
+.songbook-page .songbook-dock {
+  background: color-mix(in srgb, var(--dock-bg) 92%, transparent);
+  border-top-color: color-mix(in srgb, var(--accent-primary) 18%, var(--glass-border));
+  box-shadow:
+    0 -12px 40px rgb(0 0 0 / 0.35),
+    0 -1px 0 color-mix(in srgb, var(--accent-primary) 12%, transparent);
+}
+
+.songbook-page .song-card.list-row:hover {
+  border-color: color-mix(in srgb, var(--accent-primary) 35%, var(--glass-border));
+  background: color-mix(in srgb, var(--accent-primary) 6%, var(--surface-2));
+}
+
+.songbook-page .song-card.button-row:hover:not(.is-disabled) {
+  border-color: color-mix(in srgb, var(--accent-primary) 40%, var(--glass-border));
+  transform: translateY(-1px);
+}
+
+.songbook-page .empty-state {
+  border-style: dashed;
+  background: var(--surface-1);
+}
+
+.songbook-page .modal-content {
+  border-color: color-mix(in srgb, var(--accent-primary) 14%, var(--glass-border));
+  box-shadow: 0 18px 50px rgb(0 0 0 / 0.35);
+}
+
+@keyframes songbookStageGlow {
+  from {
+    opacity: 0.85;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes songbookRise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+

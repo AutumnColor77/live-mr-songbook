@@ -27,7 +27,8 @@ export async function mountDashboard(
 ): Promise<void> {
   stopAdminPolling();
   root.innerHTML = `
-    <div class="relative z-10 min-h-screen flex flex-col">
+    <div class="admin-ops relative z-10 min-h-screen flex flex-col">
+      <div class="admin-ops-stage" aria-hidden="true"></div>
       <header class="topbar sticky top-0 z-30">
         <div class="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
           <div class="flex items-center gap-3 min-w-0">
@@ -53,55 +54,56 @@ export async function mountDashboard(
         </div>
       </header>
 
-      <main class="flex-1 w-full max-w-3xl mx-auto px-4 sm:px-6 py-5 space-y-4 pb-10">
+      <main class="admin-ops-main flex-1 w-full max-w-3xl mx-auto px-4 sm:px-6 py-6 pb-12 space-y-4">
         ${
           inlineNotice
-            ? `<p class="text-sm font-semibold text-center" style="color:#4ade80">${escapeHtml(inlineNotice)}</p>`
+            ? `<p class="admin-ops-notice text-sm font-semibold text-center">${escapeHtml(inlineNotice)}</p>`
             : ""
         }
-        <section class="panel p-4 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p class="text-xs font-extrabold text-dim tracking-wide mb-1">신청 접수</p>
-            <p id="accepting-label" class="text-sm font-bold text-main">…</p>
-          </div>
-          <button id="accepting-toggle" type="button" class="primary-btn btn-sm">신청 마감하기</button>
-        </section>
+        <div class="admin-ops-status">
+          <section id="accepting-card" class="admin-ops-card admin-ops-accepting">
+            <div class="admin-ops-accepting-copy min-w-0">
+              <p class="admin-ops-kicker">신청 접수</p>
+              <p id="accepting-label" class="admin-ops-accepting-label">…</p>
+            </div>
+            <button id="accepting-toggle" type="button" class="primary-btn btn-sm shrink-0">신청 마감하기</button>
+          </section>
 
-        <section class="panel p-5">
-          <div class="flex items-center gap-3">
-            <span id="admin-now-playing-art" class="dock-art">${icons.disc(22)}</span>
+          <section class="admin-ops-card admin-ops-now">
+            <span id="admin-now-playing-art" class="dock-art admin-ops-now-art">${icons.disc(22)}</span>
             <div class="min-w-0 flex-1">
               <p class="dock-label">지금 재생</p>
               <p id="admin-now-playing" class="song-name text-sm">재생 중인 곡이 없습니다.</p>
             </div>
-          </div>
-        </section>
+          </section>
+        </div>
 
-        <section class="panel p-5">
-          <div class="flex items-center justify-between gap-3 mb-4">
-            <div class="flex items-center gap-2">
-              <h2 class="text-sm font-extrabold text-main">대기열</h2>
+        <section class="admin-ops-card admin-ops-queue">
+          <div class="admin-ops-queue-head">
+            <div class="flex items-center gap-2 min-w-0">
+              <h2 class="admin-ops-queue-title">대기열</h2>
               <span id="admin-queue-count" class="count-badge">0</span>
             </div>
-            <div class="flex items-center gap-2 flex-wrap justify-end">
-              <label id="dup-past-wrap" class="dup-past-switch" title="완료된 곡도 이번 방송에서 다시 신청하지 못하게 합니다">
-                <span class="dup-past-switch-label">과거 곡도 차단</span>
-                <button
-                  id="dup-past-toggle"
-                  type="button"
-                  class="switch"
-                  role="switch"
-                  aria-checked="false"
-                  aria-label="과거 곡도 차단"
-                >
-                  <span class="switch-thumb"></span>
-                </button>
-              </label>
-              <button id="dup-toggle" type="button" class="secondary-btn btn-sm">중복 신청 허용</button>
-              <button id="queue-clear" type="button" class="secondary-btn btn-sm">대기열 비우기</button>
-            </div>
+            <p class="admin-ops-queue-hint">드래그로 순서를 바꿀 수 있어요</p>
           </div>
-          <div id="admin-queue-list" class="space-y-2"></div>
+          <div class="admin-ops-toolbar">
+            <label id="dup-past-wrap" class="dup-past-switch" title="완료된 곡도 이번 방송에서 다시 신청하지 못하게 합니다">
+              <span class="dup-past-switch-label">과거 곡도 차단</span>
+              <button
+                id="dup-past-toggle"
+                type="button"
+                class="switch"
+                role="switch"
+                aria-checked="false"
+                aria-label="과거 곡도 차단"
+              >
+                <span class="switch-thumb"></span>
+              </button>
+            </label>
+            <button id="dup-toggle" type="button" class="secondary-btn btn-sm">중복 신청 허용</button>
+            <button id="queue-clear" type="button" class="secondary-btn btn-sm">대기열 비우기</button>
+          </div>
+          <div id="admin-queue-list" class="admin-ops-queue-list space-y-2"></div>
         </section>
       </main>
       <div id="toast" class="toast" hidden></div>
@@ -155,6 +157,9 @@ export async function mountDashboard(
 
     const accepting = Boolean(status?.acceptingRequests);
     $("#accepting-label").textContent = accepting ? "신청 받는 중" : "신청 마감";
+    const acceptingCard = $("#accepting-card");
+    acceptingCard.classList.toggle("is-open", accepting);
+    acceptingCard.classList.toggle("is-closed", !accepting);
     const toggle = $("#accepting-toggle") as HTMLButtonElement;
     toggle.textContent = accepting ? "신청 마감하기" : "신청 다시 열기";
     toggle.classList.toggle("primary-btn", accepting);
@@ -200,16 +205,16 @@ export async function mountDashboard(
     const list = $("#admin-queue-list");
 
     if (active.length === 0) {
-      list.innerHTML = `<div class="empty-state" style="padding:32px 16px">대기 중인 곡이 없습니다.</div>`;
+      list.innerHTML = `<div class="admin-ops-empty">대기 중인 곡이 없습니다.</div>`;
       return;
     }
 
     list.innerHTML = active
       .map((item, index) => {
-        const playingBadge =
-          item.status === "playing"
-            ? `<span class="status-badge playing">재생중</span>`
-            : "";
+        const playing = item.status === "playing";
+        const playingBadge = playing
+          ? `<span class="status-badge playing">재생중</span>`
+          : "";
         const payBadge =
           typeof item.payAmount === "number" && item.payAmount > 0
             ? `<span class="status-badge">${escapeHtml(item.payAmount.toLocaleString("ko-KR"))}원</span>`
@@ -218,7 +223,7 @@ export async function mountDashboard(
           ? `<p class="text-[11px] font-medium text-dim mt-0.5">${escapeHtml(item.comment)}</p>`
           : "";
         return `
-          <div class="queue-row admin-queue-row !items-center" draggable="true" data-id="${escapeHtml(item.id)}">
+          <div class="queue-row admin-queue-row admin-ops-row${!playing ? "" : " is-playing"} !items-center" draggable="true" data-id="${escapeHtml(item.id)}">
             <span class="queue-drag-handle" title="드래그하여 순서 변경" aria-hidden="true">⋮⋮</span>
             <span class="queue-index">${index + 1}</span>
             <div class="min-w-0 flex-1">
