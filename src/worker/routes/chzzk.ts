@@ -1,7 +1,14 @@
 import { Hono } from "hono";
 import { requireChannelAdmin } from "../auth";
 import { ingestChzzkRequest, type IngestSource } from "../request-ingest";
+import {
+  clientIp,
+  consumeRateLimit,
+  rateLimitedResponse,
+} from "../rate-limit";
 import type { AppEnv } from "../types";
+
+const INGEST_PER_MINUTE = 120;
 
 const chzzk = new Hono<AppEnv>();
 
@@ -9,6 +16,18 @@ chzzk.use("*", requireChannelAdmin);
 
 chzzk.post("/ingest", async (c) => {
   const channelId = c.get("channel").id;
+  const ip = clientIp(c);
+  const limited = await consumeRateLimit(
+    c.env.DB,
+    `ingest:${channelId}:${ip}`,
+    INGEST_PER_MINUTE,
+    60_000,
+  );
+  if (!limited.ok) {
+    const res = rateLimitedResponse(limited.retryAfterSec);
+    return c.json(res.body, res.status, res.headers);
+  }
+
   let body: {
     source?: string;
     text?: string;

@@ -2,6 +2,7 @@ export type Bindings = {
   DB: D1Database;
   PLATFORM_ADMIN_TOKEN: string;
   ASSETS: Fetcher;
+  THUMB_KV?: KVNamespace;
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
   NAVER_CLIENT_ID?: string;
@@ -111,12 +112,20 @@ export type Song = {
 /** Max JPEG data-URL length from Manager prepareSongbookThumbnail (~80KB text). */
 export const SONG_THUMBNAIL_MAX_DATA_URL_CHARS = 80_000;
 const MAX_HTTP_THUMBNAIL_CHARS = 2048;
+const MANAGED_THUMB_PREFIX = "/api/media/thumbs/";
 
-/** http(s) URL or compact data:image/*; local paths rejected */
+/** http(s) URL, managed media path, or compact data:image/*; local paths rejected */
 export function normalizeThumbnail(raw: unknown): string {
   if (typeof raw !== "string") return "";
   const value = raw.trim();
   if (!value) return "";
+
+  if (value.startsWith(MANAGED_THUMB_PREFIX)) {
+    if (value.length > MAX_HTTP_THUMBNAIL_CHARS) return "";
+    // /api/media/thumbs/{channelId}/{songId}
+    if (!/^\/api\/media\/thumbs\/[^/]+\/[^/]+$/.test(value)) return "";
+    return value;
+  }
 
   if (value.startsWith("data:image/")) {
     if (value.length > SONG_THUMBNAIL_MAX_DATA_URL_CHARS) return "";

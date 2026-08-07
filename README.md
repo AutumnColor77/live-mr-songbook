@@ -90,7 +90,7 @@ npx wrangler secret put CHZZK_CLIENT_SECRET
 
 - **channels** — `slug`, `name`, `admin_token_hash`
 - **channel_members** — 사용자↔채널 역할(`admin` 등). 로그인 사용자는 **본인 채널 1개**
-- **songs** — `title`, `artist`, `category`(큐레이션), `genre`, `tags`, `song_key`, `bpm`, `difficulty`(1–5), `thumbnail`(http(s) 또는 압축 data URL), `enabled`
+- **songs** — `title`, `artist`, `category`(큐레이션), `genre`, `tags`, `song_key`, `bpm`, `difficulty`(1–5), `thumbnail`(http(s)·managed `/api/media/thumbs/...`·또는 압축 data URL), `enabled`
 - **requests / settings** — 채널 스코프 대기열·신청 수락·Now Playing
 - **users / sessions** — Google/Naver 계정, HttpOnly `sb_session` 쿠키
 - 시청자: 홈 디렉터리에서 노래책 탐색·선택 로그인  
@@ -167,7 +167,7 @@ Manager 앱에서 Songbook에 로그인한 뒤 라이브러리를 채널로 **Pu
 
 - 본인 채널만 대상. 없으면 `/api/me/channels`로 생성 유도
 - 곡 메타: 제목·아티스트·장르·카테고리·태그·키·BPM·난이도·후원금액·썸네일
-- 썸네일: `http(s)` URL 유지, 로컬 이미지는 JPEG data URL로 압축 업로드
+- 썸네일: `http(s)` URL 유지, 로컬 이미지는 JPEG data URL로 압축 업로드 후 Worker가 KV에 저장하고 `/api/media/thumbs/...` 경로로 서빙
 - 기존 곡은 title+artist 키로 PATCH
 - 로컬에 없는 원격 곡은 Push 시 `enabled=false`(공개 목록 숨김)
 - 신청 대기열 순서는 `sort_order` — Manager 신청목록·웹 admin 드래그 → `POST .../queue/reorder`

@@ -1,9 +1,12 @@
 import { Hono } from "hono";
 import { newId } from "../../id";
 import {
+  deleteThumbnailBlob,
+  persistThumbnail,
+} from "../../thumbnails";
+import {
   mapSong,
   normalizeDonationAmount,
-  normalizeThumbnail,
   type AppEnv,
   type SongRow,
 } from "../../types";
@@ -53,9 +56,14 @@ songs.post("/songs", async (c) => {
   const difficulty = normalizeDifficulty(body.difficulty);
   const donationAmount = normalizeDonationAmount(body.donationAmount);
   const tags = Array.isArray(body.tags) ? body.tags.map(String) : [];
-  const thumbnail = normalizeThumbnail(body.thumbnail);
   const now = Date.now();
   const id = newId("song");
+  const thumbnail = await persistThumbnail(
+    c.env,
+    channelId,
+    id,
+    body.thumbnail,
+  );
 
   await c.env.DB.prepare(
     `INSERT INTO songs (id, channel_id, title, artist, category, genre, tags, song_key, bpm, difficulty, donation_amount, thumbnail, enabled, created_at, updated_at)
@@ -139,7 +147,13 @@ songs.patch("/songs/:id", async (c) => {
       : (existing.donation_amount ?? null);
   const thumbnail =
     body.thumbnail !== undefined
-      ? normalizeThumbnail(body.thumbnail)
+      ? await persistThumbnail(
+          c.env,
+          channelId,
+          id,
+          body.thumbnail,
+          existing.thumbnail ?? "",
+        )
       : (existing.thumbnail ?? "");
   const enabled =
     body.enabled !== undefined ? (body.enabled ? 1 : 0) : existing.enabled;
@@ -177,12 +191,13 @@ songs.delete("/songs/:id", async (c) => {
   const channelId = c.get("channel").id;
   const id = c.req.param("id");
   const existing = await c.env.DB.prepare(
-    "SELECT id FROM songs WHERE id = ? AND channel_id = ?",
+    "SELECT id, thumbnail FROM songs WHERE id = ? AND channel_id = ?",
   )
     .bind(id, channelId)
-    .first();
+    .first<{ id: string; thumbnail: string }>();
   if (!existing) return c.json({ error: "Song not found" }, 404);
 
+  await deleteThumbnailBlob(c.env, channelId, id, existing.thumbnail ?? "");
   await c.env.DB.prepare("DELETE FROM songs WHERE id = ? AND channel_id = ?")
     .bind(id, channelId)
     .run();

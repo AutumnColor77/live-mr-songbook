@@ -86,6 +86,16 @@ export async function ingestChzzkRequest(
     };
   }
 
+  // Parse before accepting / idempotency queries so non-commands exit after 1 read.
+  const parsed = parseRequestCommand(text, settings.prefix, settings.separator);
+  if (!parsed) {
+    return {
+      ok: false,
+      status: 400,
+      error: `Message must look like: ${settings.prefix} artist-title`,
+    };
+  }
+
   const accepting = await db
     .prepare(
       "SELECT value FROM settings WHERE channel_id = ? AND key = 'accepting_requests'",
@@ -119,15 +129,6 @@ export async function ingestChzzkRequest(
     if (existing) {
       return { ok: true, request: mapRequest(existing), duplicate: true };
     }
-  }
-
-  const parsed = parseRequestCommand(text, settings.prefix, settings.separator);
-  if (!parsed) {
-    return {
-      ok: false,
-      status: 400,
-      error: `Message must look like: ${settings.prefix} artist-title`,
-    };
   }
 
   const { results: songRows } = await db

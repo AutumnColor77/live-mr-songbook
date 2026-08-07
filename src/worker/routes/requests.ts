@@ -5,13 +5,31 @@ import {
 } from "../duplicate-policy";
 import { newId } from "../id";
 import { songRequiresDonation } from "../request-ingest";
+import {
+  clientIp,
+  consumeRateLimit,
+  rateLimitedResponse,
+} from "../rate-limit";
 import { loadRequestCommandSettings } from "../request-settings";
 import { mapRequest, type AppEnv, type RequestRow, type SongRow } from "../types";
+
+const REQUESTS_PER_MINUTE = 20;
 
 const requests = new Hono<AppEnv>();
 
 requests.post("/", async (c) => {
   const channelId = c.get("channel").id;
+  const ip = clientIp(c);
+  const limited = await consumeRateLimit(
+    c.env.DB,
+    `req:${channelId}:${ip}`,
+    REQUESTS_PER_MINUTE,
+    60_000,
+  );
+  if (!limited.ok) {
+    const res = rateLimitedResponse(limited.retryAfterSec);
+    return c.json(res.body, res.status, res.headers);
+  }
 
   const requestSettings = await loadRequestCommandSettings(c.env.DB, channelId);
   if (requestSettings.mode === "paid") {

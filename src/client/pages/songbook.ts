@@ -27,6 +27,7 @@ import {
   readViewMode,
   renderFilterPanels,
 } from "../songbook/filters";
+import { startVisibilityPolling } from "../lib/visibility-polling";
 import { updateStatusUI } from "../songbook/queue-ui";
 import { createRequestGate } from "../songbook/request-gate";
 import {
@@ -291,9 +292,12 @@ export async function mountSongbook(
   document.addEventListener("keydown", onKeyDown);
 
   await Promise.all([refreshSongs(), refreshQueueAndStatus()]);
-  const pollId = window.setInterval(() => void refreshQueueAndStatus(), 5000);
+  const stopPolling = startVisibilityPolling(
+    () => void refreshQueueAndStatus(),
+    8000,
+  );
   (root as HTMLElement & { __songbookCleanup?: () => void }).__songbookCleanup = () => {
     document.removeEventListener("keydown", onKeyDown);
-    window.clearInterval(pollId);
+    stopPolling();
   };
 }

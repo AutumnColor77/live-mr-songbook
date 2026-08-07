@@ -480,6 +480,6 @@ export async function mountDashboard(
   });
 
   await refresh();
-  startAdminPolling(() => void refresh(), 4000);
+  startAdminPolling(() => void refresh(), 8000);
 }
 

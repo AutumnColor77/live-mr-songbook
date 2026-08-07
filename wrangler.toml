@@ -28,6 +28,11 @@ database_name = "live-mr-songbook"
 database_id = "e2842118-6029-41bc-b309-f8e0a1b8bed1"
 migrations_dir = "migrations"
 
+[[kv_namespaces]]
+binding = "THUMB_KV"
+id = "6dccf2d52ba3422a9778576865e5fffa"
+preview_id = "7f061ecc169242c982bb21e770d81738"
+
 [[durable_objects.bindings]]
 name = "CHZZK_SESSION"
 class_name = "ChzzkSessionDO"
@@ -35,6 +40,9 @@ class_name = "ChzzkSessionDO"
 [[migrations]]
 tag = "chzzk-session-v1"
 new_sqlite_classes = ["ChzzkSessionDO"]
+
+[triggers]
+crons = ["0 */6 * * *"]
 
 [assets]
 not_found_handling = "single-page-application"

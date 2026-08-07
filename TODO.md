@@ -42,12 +42,13 @@
 - [x] 대기열 `sort_order` + `POST /admin/queue/reorder` (앱·웹 운영 드래그 동기화)
 - [ ] Pull(Songbook → Manager 라이브러리)
 - [ ] 원격 hard-delete·ID 기반 양방향 정합
-- [ ] 썸네일 R2(또는 동등 오브젝트 스토리지)로 data URL 부담 완화
+- [x] 썸네일 KV(`/api/media/thumbs/...`)로 data URL 부담 완화 (R2는 계정 활성화 후 이전 가능)
 - [ ] Companion 링크·프로모 UX 고도화
 
 ## 5. 실시간·인프라
 
 - [x] 신청 대기열 폴링(공개 `/queue` · admin 목록) — WebSocket은 미도입
+- [x] 공개 신청·ingest rate limit + 6시간 cron 유지보수(세션/요청 이력 purge·썸네일 마이그레이션)
 - [ ] 대기열 WebSocket / Durable Objects
 - [ ] 치지직 채팅·후원 세션용 Durable Object(`ChzzkSessionDO`) — [docs/chzzk-paid-requests.md](docs/chzzk-paid-requests.md)
 - [ ] 커스텀 도메인

@@ -1,7 +1,8 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { loadChannel } from "./auth";
-import type { AppEnv } from "./types";
+import { runMaintenance } from "./maintenance";
+import type { AppEnv, Bindings } from "./types";
 import songs from "./routes/songs";
 import status from "./routes/status";
 import queue from "./routes/queue";
@@ -13,6 +14,7 @@ import authRoutes from "./routes/auth";
 import meRoutes from "./routes/me";
 import directory from "./routes/directory";
 import legacyGone from "./routes/legacy-gone";
+import media from "./routes/media";
 
 const app = new Hono<AppEnv>();
 
@@ -30,6 +32,7 @@ app.route("/api/auth", authRoutes);
 app.route("/api/me", meRoutes);
 app.route("/api/directory", directory);
 app.route("/api/platform", platform);
+app.route("/api/media", media);
 
 const channelApi = new Hono<AppEnv>();
 channelApi.use("*", loadChannel);
@@ -51,5 +54,24 @@ app.notFound((c) => {
   return c.env.ASSETS.fetch(c.req.raw);
 });
 
-export default app;
+async function scheduled(
+  _controller: ScheduledController,
+  env: Bindings,
+  ctx: ExecutionContext,
+): Promise<void> {
+  ctx.waitUntil(
+    runMaintenance(env)
+      .then((summary) => {
+        console.log("[maintenance]", summary);
+      })
+      .catch((err) => {
+        console.error("[maintenance]", err);
+      }),
+  );
+}
+
+export default {
+  fetch: app.fetch.bind(app),
+  scheduled,
+};
 export { ChzzkSessionDO } from "./chzzk-session-do";

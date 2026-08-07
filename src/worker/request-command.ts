@@ -31,6 +31,14 @@ export type ParsedRequestCommand = {
   title: string;
 };
 
+/** Cheap prefix gate (case-insensitive NFKC) before heavier parse / DB work. */
+export function hasRequestCommandPrefix(text: string, prefix: string): boolean {
+  const trimmed = text.normalize("NFKC").trim();
+  const prefixNorm = prefix.normalize("NFKC").trim();
+  if (!trimmed || !prefixNorm) return false;
+  return trimmed.toLowerCase().startsWith(prefixNorm.toLowerCase());
+}
+
 /**
  * Parse `!신청 artist-title` (or em-dash / custom separator).
  * Prefix match is case-insensitive after NFKC normalize of the leading token area.
@@ -46,9 +54,7 @@ export function parseRequestCommand(
   const prefixNorm = prefix.normalize("NFKC").trim();
   if (!prefixNorm) return null;
 
-  const lower = trimmed.toLowerCase();
-  const prefixLower = prefixNorm.toLowerCase();
-  if (!lower.startsWith(prefixLower)) return null;
+  if (!hasRequestCommandPrefix(trimmed, prefixNorm)) return null;
 
   let body = trimmed.slice(prefixNorm.length).trim();
   if (!body) return null;

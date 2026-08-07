@@ -9,12 +9,20 @@ import {
   updateChzzkSessionStatus,
   updateChzzkTokens,
 } from "./chzzk/links";
+import { hasRequestCommandPrefix } from "./request-command";
 import { ingestChzzkRequest } from "./request-ingest";
+import { loadRequestCommandSettings } from "./request-settings";
 import type { Bindings } from "./types";
 
 const PING_ALARM_MS = 20_000;
-const RECONNECT_ALARM_MS = 15_000;
+const RECONNECT_BASE_MS = 15_000;
+const RECONNECT_CAP_MS = 5 * 60 * 1000;
 const CONNECT_TIMEOUT_MS = 25_000;
+
+function reconnectDelayMs(attempt: number): number {
+  const exp = Math.min(attempt, 10);
+  return Math.min(RECONNECT_CAP_MS, RECONNECT_BASE_MS * 2 ** exp);
+}
 
 /**
  * Convert Chzzk session URL to Engine.IO websocket upgrade URL (Socket.IO 2.x / EIO3).
@@ -100,6 +108,7 @@ export class ChzzkSessionDO extends DurableObject<Bindings> {
       }
       this.wantRunning = true;
       await this.ctx.storage.put("wantRunning", true);
+      await this.ctx.storage.put("reconnectAttempt", 0);
       try {
         await this.startSession();
         return Response.json({
@@ -110,6 +119,7 @@ export class ChzzkSessionDO extends DurableObject<Bindings> {
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         await this.setStatus("error", msg);
+        await this.scheduleReconnect();
         return Response.json({ error: msg }, { status: 500 });
       }
     }
@@ -195,7 +205,7 @@ export class ChzzkSessionDO extends DurableObject<Bindings> {
             "no SYSTEM connected (check scopes / socket packets)",
           );
           this.closeSocket("connect timeout");
-          this.ctx.storage.setAlarm(Date.now() + RECONNECT_ALARM_MS);
+          await this.scheduleReconnect();
           return;
         }
         // Still connecting — Engine.IO client ping
@@ -218,8 +228,22 @@ export class ChzzkSessionDO extends DurableObject<Bindings> {
       const msg = err instanceof Error ? err.message : String(err);
       console.error("[ChzzkSessionDO] alarm", msg);
       await this.setStatus("error", msg);
-      this.ctx.storage.setAlarm(Date.now() + RECONNECT_ALARM_MS);
+      await this.scheduleReconnect();
     }
+  }
+
+  private async scheduleReconnect() {
+    this.wantRunning =
+      (await this.ctx.storage.get<boolean>("wantRunning")) ?? this.wantRunning;
+    if (!this.wantRunning) {
+      await this.ctx.storage.deleteAlarm();
+      return;
+    }
+    const attempt =
+      (await this.ctx.storage.get<number>("reconnectAttempt")) ?? 0;
+    const delay = reconnectDelayMs(attempt);
+    await this.ctx.storage.put("reconnectAttempt", attempt + 1);
+    this.ctx.storage.setAlarm(Date.now() + delay);
   }
 
   private sendPing() {
@@ -337,6 +361,7 @@ export class ChzzkSessionDO extends DurableObject<Bindings> {
     this.closeSocket(reason);
     this.sessionKey = "";
     await this.ctx.storage.delete("sessionKey");
+    await this.ctx.storage.put("reconnectAttempt", 0);
     await this.setStatus("disconnected", reason);
     await this.ctx.storage.deleteAlarm();
   }
@@ -409,7 +434,7 @@ export class ChzzkSessionDO extends DurableObject<Bindings> {
       : `socket closed ${code}`;
     await this.setStatus("disconnected", detail);
     if (this.wantRunning) {
-      this.ctx.storage.setAlarm(Date.now() + RECONNECT_ALARM_MS);
+      await this.scheduleReconnect();
     }
   }
 
@@ -421,7 +446,7 @@ export class ChzzkSessionDO extends DurableObject<Bindings> {
     if (!this.channelId) return;
     await this.setStatus("error", "socket error");
     if (this.wantRunning) {
-      this.ctx.storage.setAlarm(Date.now() + RECONNECT_ALARM_MS);
+      await this.scheduleReconnect();
     }
   }
 
@@ -472,12 +497,13 @@ export class ChzzkSessionDO extends DurableObject<Bindings> {
       const token = await this.ensureFreshToken();
       await subscribeSessionEvent(token, "donation", this.sessionKey);
       await subscribeSessionEvent(token, "chat", this.sessionKey);
+      await this.ctx.storage.put("reconnectAttempt", 0);
       await this.setStatus("connected", this.sessionKey);
       this.ctx.storage.setAlarm(Date.now() + PING_ALARM_MS);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       await this.setStatus("error", msg);
-      this.ctx.storage.setAlarm(Date.now() + RECONNECT_ALARM_MS);
+      await this.scheduleReconnect();
     }
   }
 
@@ -521,6 +547,14 @@ export class ChzzkSessionDO extends DurableObject<Bindings> {
     };
     const text = (d.content ?? "").trim();
     if (!text || !this.channelId) return;
+
+    // Drop non-commands before any D1 work (prefix is a fixed product default).
+    const settings = await loadRequestCommandSettings(
+      this.env.DB,
+      this.channelId,
+    );
+    if (!hasRequestCommandPrefix(text, settings.prefix)) return;
+
     const externalId = [
       "chat",
       d.senderChannelId ?? "",
