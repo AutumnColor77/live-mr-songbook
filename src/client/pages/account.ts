@@ -30,7 +30,7 @@ export async function mountAccount(
   toastMsg = "",
 ): Promise<void> {
   applyTheme(currentTheme());
-  document.title = "내 채널 · Live MR Songbook";
+  document.title = "내 계정 · Live MR Songbook";
 
   const nextPath = safeNextPath("");
   const ownChannels = channels.filter((ch) => ch.slug !== "demo");
@@ -93,7 +93,7 @@ export async function mountAccount(
         <div class="account-card panel max-w-md w-full p-8 space-y-6">
           <div class="text-center space-y-3">
             <p class="account-kicker">계정</p>
-            <h1 class="account-title">내 채널</h1>
+            <h1 class="account-title">내 계정</h1>
             <div class="flex items-center gap-3 justify-center">
               ${
                 user.picture

@@ -73,7 +73,7 @@ export function mountLanding(
     ? `
       <div class="landing-hero-cta flex flex-col sm:flex-row gap-2.5 w-full max-w-md mx-auto">
         <a href="#directory" class="primary-btn flex-1 text-center">노래책 둘러보기</a>
-        <a href="/me" class="secondary-btn flex-1 text-center">내 채널</a>
+        <a href="/me" class="secondary-btn flex-1 text-center">내 계정</a>
       </div>
     `
     : `
@@ -102,7 +102,7 @@ export function mountLanding(
           <div class="flex items-center gap-2 shrink-0">
             ${
               user
-                ? `<span class="hidden sm:inline text-xs font-semibold text-dim max-w-[8rem] truncate">${escapeHtml(user.name || user.email)}</span>
+                ? `<a href="/me" class="secondary-btn btn-sm">계정</a>
                    <button id="logout-btn" type="button" class="secondary-btn btn-sm">로그아웃</button>`
                 : ""
             }

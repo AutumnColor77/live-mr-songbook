@@ -55,7 +55,7 @@ function authSlotHtml(
   if (user) {
     const label = escapeHtml(user.name || user.email || "로그인됨");
     return `
-      <span class="hidden sm:inline text-xs font-semibold text-dim max-w-[7rem] truncate" title="${label}">${label}</span>
+      <a href="/me" class="secondary-btn btn-sm" title="${label}">계정</a>
       <a href="/c/${escapeHtml(slug)}/admin" class="secondary-btn btn-sm hidden sm:inline-flex">운영</a>
       <button id="logout-btn" type="button" class="secondary-btn btn-sm">로그아웃</button>
     `;
