@@ -1,6 +1,7 @@
 import { submitRequest } from "../api";
 import type { AuthUser } from "../auth-api";
 import { $, escapeHtml } from "../dom";
+import { clampNickname } from "../limits";
 import type { ToastController } from "../toast";
 import type { RequestMode } from "../types";
 import type { RequestGate } from "./request-gate";
@@ -24,7 +25,7 @@ function minPriceKrw(state: SongbookState, songDonation: number | null | undefin
 
 function resolveRequester(user: AuthUser | null): string {
   const fromUser = user?.name?.trim() || "";
-  return fromUser || readStoredNickname().trim() || "익명";
+  return clampNickname(fromUser || readStoredNickname(), "익명");
 }
 
 function setHowtoRows(rows: { label: string; text: string }[]) {

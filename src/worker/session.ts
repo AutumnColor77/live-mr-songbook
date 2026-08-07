@@ -2,6 +2,7 @@ import type { Context } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { bearerToken, sha256Hex } from "./crypto";
 import { newId } from "./id";
+import { clampNickname } from "./limits";
 import type { AppEnv, AuthUser, UserRow } from "./types";
 
 export const SESSION_COOKIE = "sb_session";
@@ -130,7 +131,9 @@ export async function upsertOAuthUser(
 
   if (existing) {
     const setupDone = Boolean(existing.profile_setup_done);
-    const name = setupDone ? existing.name : profile.name;
+    const name = setupDone
+      ? existing.name
+      : clampNickname(profile.name, existing.name || "User");
     const picture = setupDone ? existing.picture : profile.picture;
     const googleSub =
       profile.provider === "google" ? profile.sub : existing.google_sub || `naver:${profile.sub}`;
@@ -172,6 +175,7 @@ export async function upsertOAuthUser(
   const id = newId("usr");
   const googleSub =
     profile.provider === "google" ? profile.sub : `naver:${profile.sub}`;
+  const name = clampNickname(profile.name, "User");
   await db
     .prepare(
       `INSERT INTO users (id, google_sub, provider, provider_sub, email, name, picture, profile_setup_done, created_at, updated_at)
@@ -183,7 +187,7 @@ export async function upsertOAuthUser(
       profile.provider,
       profile.sub,
       profile.email,
-      profile.name,
+      name,
       profile.picture,
       now,
       now,
@@ -198,7 +202,7 @@ export async function upsertOAuthUser(
       provider: profile.provider,
       provider_sub: profile.sub,
       email: profile.email,
-      name: profile.name,
+      name,
       picture: profile.picture,
       profile_setup_done: 0,
       created_at: now,
@@ -213,7 +217,7 @@ export async function updateUserProfile(
   input: { name: string; picture: string },
 ): Promise<UserRow | null> {
   const now = Date.now();
-  const name = input.name.trim().slice(0, 32);
+  const name = clampNickname(input.name);
   if (!name) return null;
 
   const picture = input.picture.trim();

@@ -4,6 +4,7 @@ import {
   loadDuplicatePolicy,
 } from "../duplicate-policy";
 import { newId } from "../id";
+import { clampNickname } from "../limits";
 import { songRequiresDonation } from "../request-ingest";
 import {
   clientIp,
@@ -101,7 +102,7 @@ requests.post("/", async (c) => {
 
   const nicknameRaw = typeof body.nickname === "string" ? body.nickname.trim() : "";
   const commentRaw = typeof body.comment === "string" ? body.comment.trim() : "";
-  const nickname = nicknameRaw.slice(0, 40) || "익명";
+  const nickname = clampNickname(nicknameRaw, "익명");
   const comment = commentRaw.slice(0, 200);
 
   const id = newId("req");

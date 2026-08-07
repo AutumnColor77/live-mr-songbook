@@ -660,7 +660,9 @@
   animation: songbookStageGlow 16s ease-in-out infinite alternate;
 }
 
-.songbook-page > :not(.songbook-stage) {
+.songbook-page > .topbar,
+.songbook-page > .songbook-main,
+.songbook-page > .songbook-dock {
   position: relative;
   z-index: 1;
 }

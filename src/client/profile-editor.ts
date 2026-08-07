@@ -4,6 +4,7 @@ import {
   type AuthUser,
 } from "./auth-api";
 import { escapeHtml } from "./dom";
+import { NICKNAME_MAX_LENGTH } from "./limits";
 
 export function profileEditorFieldsHtml(user: AuthUser): string {
   const picture = user.picture || "";
@@ -19,7 +20,8 @@ export function profileEditorFieldsHtml(user: AuthUser): string {
     </div>
     <label class="block text-left space-y-1.5">
       <span class="text-xs font-extrabold text-dim tracking-wide">닉네임</span>
-      <input id="profile-name" type="text" maxlength="32" required class="w-full rounded-xl border border-glass-border bg-[var(--surface-2)] px-3 py-2.5 text-sm text-main" value="${escapeHtml(user.name || "")}" placeholder="표시할 이름" />
+      <input id="profile-name" type="text" maxlength="${NICKNAME_MAX_LENGTH}" required class="w-full rounded-xl border border-glass-border bg-[var(--surface-2)] px-3 py-2.5 text-sm text-main" value="${escapeHtml((user.name || "").slice(0, NICKNAME_MAX_LENGTH))}" placeholder="표시할 이름" />
+      <span class="text-xs text-dim">최대 ${NICKNAME_MAX_LENGTH}자</span>
     </label>
     <p id="profile-error" class="text-sm font-semibold text-center" style="color:#f87171" hidden></p>
   `;

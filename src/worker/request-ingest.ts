@@ -3,6 +3,7 @@ import {
   loadDuplicatePolicy,
 } from "./duplicate-policy";
 import { newId } from "./id";
+import { clampNickname } from "./limits";
 import {
   findMatchingSongs,
   parseRequestCommand,
@@ -196,7 +197,7 @@ export async function ingestChzzkRequest(
     typeof input.nickname === "string" ? input.nickname.trim() : "";
   const commentRaw =
     typeof input.comment === "string" ? input.comment.trim() : "";
-  const nickname = nicknameRaw.slice(0, 40) || "익명";
+  const nickname = clampNickname(nicknameRaw, "익명");
   const comment = commentRaw.slice(0, 200);
 
   const id = newId("req");

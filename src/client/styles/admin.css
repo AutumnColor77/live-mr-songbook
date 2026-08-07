@@ -93,7 +93,8 @@
   animation: adminOpsGlow 16s ease-in-out infinite alternate;
 }
 
-.admin-ops > :not(.admin-ops-stage) {
+.admin-ops > .topbar,
+.admin-ops > .admin-ops-main {
   position: relative;
   z-index: 1;
 }

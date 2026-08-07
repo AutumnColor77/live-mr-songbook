@@ -1,4 +1,5 @@
 import { $, escapeHtml } from "../dom";
+import { clampNickname, NICKNAME_MAX_LENGTH } from "../limits";
 import type { SongbookState, ViewMode } from "./types";
 
 export type { ViewMode };
@@ -35,7 +36,7 @@ export function readFilterOpen(): { genre: boolean; artist: boolean } {
 
 export function readStoredNickname(): string {
   try {
-    return localStorage.getItem(NICKNAME_KEY) ?? "";
+    return clampNickname(localStorage.getItem(NICKNAME_KEY) ?? "");
   } catch {
     return "";
   }
@@ -43,7 +44,8 @@ export function readStoredNickname(): string {
 
 export function storeNickname(value: string) {
   try {
-    if (value) localStorage.setItem(NICKNAME_KEY, value);
+    const next = clampNickname(value);
+    if (next) localStorage.setItem(NICKNAME_KEY, next.slice(0, NICKNAME_MAX_LENGTH));
     else localStorage.removeItem(NICKNAME_KEY);
   } catch {
     /* ignore */

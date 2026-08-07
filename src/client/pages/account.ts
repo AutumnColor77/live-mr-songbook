@@ -39,7 +39,7 @@ export async function mountAccount(
 
   const channelCardHtml = own
     ? `
-        <div class="rounded-xl border border-glass-border bg-[var(--surface-2)] px-3 py-3 space-y-3">
+        <div class="account-channel-card">
           <div class="text-center">
             <p class="text-base font-extrabold text-main">${escapeHtml(own.name)}</p>
           </div>
@@ -48,26 +48,26 @@ export async function mountAccount(
             <a href="/c/${escapeHtml(own.slug)}" class="secondary-btn btn-sm flex-1 text-center" target="_blank" rel="noopener">노래책 열기</a>
           </div>
           <button type="button" id="copy-channel-url" class="secondary-btn btn-sm w-full">노래책 주소 복사</button>
-          <div class="border-t border-glass-border pt-3 space-y-2">
-            <p class="text-xs font-extrabold text-dim tracking-wide text-center">치지직 연결</p>
+          <div class="account-channel-block border-t border-glass-border pt-3 space-y-2">
+            <p class="account-kicker text-center">치지직 연결</p>
             <p id="chzzk-link-label" class="text-xs font-medium text-muted text-center">불러오는 중…</p>
             <div class="flex flex-wrap gap-2 justify-center">
               <a id="chzzk-connect" href="${chzzkConnectUrl(own.slug)}" class="primary-btn btn-sm">치지직 연결</a>
               <button id="chzzk-unlink" type="button" class="secondary-btn btn-sm" hidden>연결 해제</button>
             </div>
           </div>
-          <details class="border-t border-glass-border pt-3">
-            <summary class="cursor-pointer text-xs font-extrabold text-dim tracking-wide text-center list-none">채널 설정</summary>
+          <details class="account-channel-block border-t border-glass-border pt-3">
+            <summary class="cursor-pointer account-kicker text-center list-none">채널 설정</summary>
             <form id="edit-channel-form" class="mt-3 space-y-3" data-channel-id="${escapeHtml(own.id)}">
               <label class="block text-left space-y-1.5">
-                <span class="text-xs font-extrabold text-dim tracking-wide">표시 이름</span>
-                <input id="edit-channel-name" type="text" maxlength="80" required class="w-full rounded-xl border border-glass-border bg-[var(--surface-3)] px-3 py-2.5 text-sm text-main" value="${escapeHtml(own.name)}" />
+                <span class="account-kicker">표시 이름</span>
+                <input id="edit-channel-name" type="text" maxlength="80" required class="account-input" value="${escapeHtml(own.name)}" />
               </label>
               <label class="block text-left space-y-1.5">
-                <span class="text-xs font-extrabold text-dim tracking-wide">노래책 주소</span>
+                <span class="account-kicker">노래책 주소</span>
                 <span class="flex items-center gap-1.5">
                   <span class="text-xs text-dim shrink-0">/c/</span>
-                  <input id="edit-channel-slug" type="text" maxlength="63" required pattern="[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?" class="w-full rounded-xl border border-glass-border bg-[var(--surface-3)] px-3 py-2.5 text-sm text-main" value="${escapeHtml(own.slug)}" />
+                  <input id="edit-channel-slug" type="text" maxlength="63" required pattern="[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?" class="account-input" value="${escapeHtml(own.slug)}" />
                 </span>
               </label>
               <p id="edit-channel-error" class="text-sm font-semibold text-center" style="color:#f87171" hidden></p>
@@ -75,10 +75,11 @@ export async function mountAccount(
             </form>
           </details>
         </div>`
-    : `<p class="text-sm text-dim text-center py-2">아직 만든 채널이 없습니다.</p>`;
+    : `<p class="account-empty">아직 만든 채널이 없습니다.</p>`;
 
   root.innerHTML = `
-    <div class="relative z-10 min-h-screen flex flex-col">
+    <div class="account-page relative z-10 min-h-screen flex flex-col">
+      <div class="account-stage" aria-hidden="true"></div>
       <header class="topbar sticky top-0 z-30">
         <div class="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
           ${logoLinkHtml()}
@@ -88,10 +89,11 @@ export async function mountAccount(
           </div>
         </div>
       </header>
-      <main class="flex-1 flex items-center justify-center px-4 py-12">
-        <div class="panel max-w-md w-full p-8 space-y-6">
+      <main class="account-main flex-1 flex items-center justify-center px-4 py-12">
+        <div class="account-card panel max-w-md w-full p-8 space-y-6">
           <div class="text-center space-y-3">
-            <h1 class="text-xl font-extrabold text-main">내 채널</h1>
+            <p class="account-kicker">계정</p>
+            <h1 class="account-title">내 채널</h1>
             <div class="flex items-center gap-3 justify-center">
               ${
                 user.picture
@@ -120,17 +122,17 @@ export async function mountAccount(
           <form id="create-channel-form" class="space-y-3 border-t border-glass-border pt-5">
             <p class="text-sm font-extrabold text-main text-center">채널 만들기</p>
             <label class="block text-left space-y-1.5">
-              <span class="text-xs font-extrabold text-dim tracking-wide">표시 이름</span>
-              <input id="channel-name" type="text" maxlength="80" required class="w-full rounded-xl border border-glass-border bg-[var(--surface-2)] px-3 py-2.5 text-sm text-main" placeholder="예: 가을색의 노래책" value="${escapeHtml(user.name ? `${user.name}의 노래책` : "")}" />
+              <span class="account-kicker">표시 이름</span>
+              <input id="channel-name" type="text" maxlength="80" required class="account-input" placeholder="예: 가을색의 노래책" value="${escapeHtml(user.name ? `${user.name}의 노래책` : "")}" />
             </label>
             <p id="channel-url-hint" class="text-xs text-dim text-left leading-relaxed">
               노래책 주소는 자동으로 만들어집니다. 나중에 바꿀 수 있어요.
             </p>
             <details id="slug-details" class="text-left">
-              <summary class="cursor-pointer text-xs font-extrabold text-dim tracking-wide">주소 직접 지정</summary>
+              <summary class="cursor-pointer account-kicker">주소 직접 지정</summary>
               <label class="mt-2 flex items-center gap-1.5">
                 <span class="text-xs text-dim shrink-0">/c/</span>
-                <input id="channel-slug" type="text" maxlength="63" pattern="[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?" class="w-full rounded-xl border border-glass-border bg-[var(--surface-2)] px-3 py-2.5 text-sm text-main" placeholder="비우면 자동 생성" />
+                <input id="channel-slug" type="text" maxlength="63" pattern="[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?" class="account-input" placeholder="비우면 자동 생성" />
               </label>
             </details>
             <p id="create-channel-error" class="text-sm font-semibold text-center" style="color:#f87171" hidden></p>
@@ -154,8 +156,8 @@ export async function mountAccount(
                 계정과 소유 채널·곡·대기열·치지직 연결이 영구 삭제됩니다. 되돌릴 수 없습니다.
               </p>
               <label class="block text-left space-y-1.5">
-                <span class="text-xs font-extrabold text-dim tracking-wide">확인을 위해 「탈퇴」를 입력</span>
-                <input id="delete-account-confirm" type="text" autocomplete="off" class="w-full rounded-xl border border-glass-border bg-[var(--surface-2)] px-3 py-2.5 text-sm text-main" placeholder="탈퇴" />
+                <span class="account-kicker">확인을 위해 「탈퇴」를 입력</span>
+                <input id="delete-account-confirm" type="text" autocomplete="off" class="account-input" placeholder="탈퇴" />
               </label>
               <p id="delete-account-error" class="text-sm font-semibold text-center" style="color:#f87171" hidden></p>
               <button type="submit" class="secondary-btn w-full btn-sm" style="color:#f87171;border-color:rgba(248,113,113,0.45)">계정 탈퇴</button>
