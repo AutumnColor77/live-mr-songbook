@@ -173,6 +173,16 @@ export async function logout(): Promise<void> {
   });
 }
 
+/** Permanently delete the signed-in account and owned channels. */
+export async function deleteAccount(confirm: string): Promise<void> {
+  await fetchJson<{ ok: boolean }>("/api/me", {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ confirm }),
+    signal: AbortSignal.timeout(60_000),
+  });
+}
+
 /** Complete OAuth when SPA accidentally received the provider callback URL. */
 export async function exchangeOAuthCode(
   provider: OAuthProvider,

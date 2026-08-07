@@ -1,8 +1,16 @@
 import { Hono } from "hono";
+import {
+  ACCOUNT_DELETE_CONFIRM,
+  deleteUserAccount,
+} from "../account-delete";
 import { seedDefaultChannelSettings } from "../channel-settings";
 import { sha256Hex, SLUG_RE } from "../crypto";
 import { newId } from "../id";
-import { loadUserFromSession, randomToken } from "../session";
+import {
+  destroySession,
+  loadUserFromSession,
+  randomToken,
+} from "../session";
 import type { AppEnv, ChannelRow } from "../types";
 
 const RESERVED_SLUGS = new Set(["demo", "me", "api", "admin", "c"]);
@@ -62,6 +70,28 @@ async function allocateSlug(
 }
 
 const me = new Hono<AppEnv>();
+
+me.delete("/", async (c) => {
+  const user = await loadUserFromSession(c);
+  if (!user) return c.json({ error: "Unauthorized" }, 401);
+
+  let body: { confirm?: string } = {};
+  try {
+    body = (await c.req.json()) as { confirm?: string };
+  } catch {
+    /* empty body */
+  }
+  if (body.confirm !== ACCOUNT_DELETE_CONFIRM) {
+    return c.json(
+      { error: `확인을 위해 "${ACCOUNT_DELETE_CONFIRM}"를 입력해 주세요.` },
+      400,
+    );
+  }
+
+  await deleteUserAccount(c.env, user.id);
+  await destroySession(c);
+  return c.json({ ok: true });
+});
 
 me.post("/channels", async (c) => {
   const user = await loadUserFromSession(c);

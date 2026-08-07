@@ -12,6 +12,7 @@
 - [x] 시청자 선택 로그인(`/c/:slug`·홈 `/` 복귀, 닉네임 프리필)
 - [x] 시청자 홈 디렉터리(`GET /api/directory/channels`, 정사각 카드·소유자 프로필)
 - [x] demo 채널 제거(`migrations/0014_delete_demo.sql`)
+- [x] 계정 탈퇴(`/me` · 소유 채널·곡·대기열 cascade 하드 삭제)
 - [ ] 시청자 신청 이력·`requests.user_id` 연동
 
 ## 2. 채널·권한

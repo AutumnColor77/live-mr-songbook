@@ -1,6 +1,7 @@
 import { safeNextPath } from "../auth-feedback";
 import {
   createChannel,
+  deleteAccount,
   fetchSession,
   logout,
   updateChannel,
@@ -143,6 +144,21 @@ export async function mountAccount(
             <form id="profile-edit-form" class="mt-4 space-y-5 text-center">
               ${profileEditorFieldsHtml(user)}
               <button type="submit" class="primary-btn w-full">프로필 저장</button>
+            </form>
+          </details>
+
+          <details class="border-t border-glass-border pt-5">
+            <summary class="cursor-pointer text-sm font-extrabold text-center list-none" style="color:#f87171">계정 탈퇴</summary>
+            <form id="delete-account-form" class="mt-4 space-y-3 text-center">
+              <p class="text-xs text-dim leading-relaxed">
+                계정과 소유 채널·곡·대기열·치지직 연결이 영구 삭제됩니다. 되돌릴 수 없습니다.
+              </p>
+              <label class="block text-left space-y-1.5">
+                <span class="text-xs font-extrabold text-dim tracking-wide">확인을 위해 「탈퇴」를 입력</span>
+                <input id="delete-account-confirm" type="text" autocomplete="off" class="w-full rounded-xl border border-glass-border bg-[var(--surface-2)] px-3 py-2.5 text-sm text-main" placeholder="탈퇴" />
+              </label>
+              <p id="delete-account-error" class="text-sm font-semibold text-center" style="color:#f87171" hidden></p>
+              <button type="submit" class="secondary-btn w-full btn-sm" style="color:#f87171;border-color:rgba(248,113,113,0.45)">계정 탈퇴</button>
             </form>
           </details>
 
@@ -338,6 +354,40 @@ export async function mountAccount(
       await mountAccount(root, saved, session?.channels ?? channels, "저장되었습니다.");
     },
   });
+
+  const deleteForm = document.querySelector<HTMLFormElement>("#delete-account-form");
+  if (deleteForm) {
+    deleteForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const confirmInput = $("#delete-account-confirm") as HTMLInputElement;
+      const deleteError = $("#delete-account-error");
+      const submitBtn = deleteForm.querySelector<HTMLButtonElement>('button[type="submit"]');
+      deleteError.hidden = true;
+      const confirmText = confirmInput.value.trim();
+      if (confirmText !== "탈퇴") {
+        deleteError.hidden = false;
+        deleteError.textContent = "확인을 위해 「탈퇴」를 입력해 주세요.";
+        return;
+      }
+      if (
+        !window.confirm(
+          "정말 탈퇴할까요? 채널·곡·대기열·치지직 연결이 모두 삭제되며 되돌릴 수 없습니다.",
+        )
+      ) {
+        return;
+      }
+      if (submitBtn) submitBtn.disabled = true;
+      try {
+        await deleteAccount(confirmText);
+        location.assign("/");
+      } catch (err) {
+        deleteError.hidden = false;
+        deleteError.textContent =
+          err instanceof Error ? err.message : "탈퇴에 실패했습니다.";
+        if (submitBtn) submitBtn.disabled = false;
+      }
+    });
+  }
 
   if (toastMsg) {
     toast.show(toastMsg);

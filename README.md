@@ -119,6 +119,7 @@ npx wrangler secret put CHZZK_CLIENT_SECRET
 |--------|------|------|
 | `POST` | `/api/me/channels` | 채널 생성 `{ name, slug? }` (계정당 1개) |
 | `PATCH` | `/api/me/channels/:id` | 이름·슬러그 수정 |
+| `DELETE` | `/api/me` | 계정 탈퇴 `{ confirm: "탈퇴" }` — 소유 채널·곡·대기열 cascade 삭제 |
 
 ### Public (per channel)
 
@@ -156,7 +157,7 @@ npx wrangler secret put CHZZK_CLIENT_SECRET
 
 - `/` — 랜딩, 소셜 로그인, 데모·내 채널 CTA
 - `/me/setup` — 최초 프로필(닉네임·아바타)
-- `/me` — 채널 생성/수정(표시 이름·슬러그), 프로필 편집
+- `/me` — 채널 생성/수정(표시 이름·슬러그), 프로필 편집, 계정 탈퇴(소유 채널 cascade 삭제)
 - `/c/:slug` — 시청자: 검색, 접이식 **장르·가수** 필터, 리스트/버튼 모드, 썸네일·난이도, 신청·대기열·Now Playing
 - `/c/:slug/admin` — 운영: 신청 on/off, 중복 정책(허용/대기열만/부른 곡 포함), 대기열 재생/완료/거절·드래그 순서·비우기(세션 초기화)
 - 테마: 다크 / 라이트 / 핑크 / 스카이
