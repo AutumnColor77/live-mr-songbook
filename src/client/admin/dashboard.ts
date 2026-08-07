@@ -223,17 +223,19 @@ export async function mountDashboard(
           ? `<p class="text-[11px] font-medium text-dim mt-0.5">${escapeHtml(item.comment)}</p>`
           : "";
         return `
-          <div class="queue-row admin-queue-row admin-ops-row${!playing ? "" : " is-playing"} !items-center" draggable="true" data-id="${escapeHtml(item.id)}">
-            <span class="queue-drag-handle" title="드래그하여 순서 변경" aria-hidden="true">⋮⋮</span>
-            <span class="queue-index">${index + 1}</span>
-            <div class="min-w-0 flex-1">
-              <div class="flex items-center gap-2 flex-wrap">
-                <p class="song-name text-sm">${escapeHtml(item.title)}</p>
-                ${playingBadge}
-                ${payBadge}
+          <div class="queue-row admin-queue-row admin-ops-row${!playing ? "" : " is-playing"}" draggable="true" data-id="${escapeHtml(item.id)}">
+            <div class="admin-queue-meta">
+              <span class="queue-drag-handle" title="드래그하여 순서 변경" aria-hidden="true">⋮⋮</span>
+              <span class="queue-index">${index + 1}</span>
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <p class="song-name text-sm">${escapeHtml(item.title)}</p>
+                  ${playingBadge}
+                  ${payBadge}
+                </div>
+                <p class="song-artist text-xs">${escapeHtml(item.artist)} · ${escapeHtml(item.nickname)}</p>
+                ${comment}
               </div>
-              <p class="song-artist text-xs">${escapeHtml(item.artist)} · ${escapeHtml(item.nickname)}</p>
-              ${comment}
             </div>
             ${queueActionsHtml(item)}
           </div>`;

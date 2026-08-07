@@ -379,6 +379,18 @@ a.secondary-btn {
 .admin-queue-row {
   cursor: grab;
   user-select: none;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.admin-queue-meta {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+  width: 100%;
+  flex: 1;
 }
 
 .admin-queue-row.is-dragging {
@@ -403,24 +415,44 @@ a.secondary-btn {
 
 .admin-queue-actions {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 6px;
-  flex-shrink: 0;
-  justify-content: flex-end;
+  width: 100%;
+  justify-content: stretch;
+}
+
+.admin-queue-actions .admin-act {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 28px;
+  padding: 0 8px;
+  font-size: 0.75rem;
 }
 
 .admin-queue-actions .admin-act.secondary-btn {
   opacity: 0.85;
 }
 
-@media (max-width: 639px) {
-  .admin-queue-actions {
-    width: 100%;
+@media (min-width: 640px) {
+  .admin-queue-row {
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
   }
 
-  .admin-queue-actions .admin-act.primary-btn {
-    flex: 1 1 auto;
-    min-width: 4.5rem;
+  .admin-queue-meta {
+    width: auto;
+  }
+
+  .admin-queue-actions {
+    width: auto;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .admin-queue-actions .admin-act {
+    flex: 0 0 auto;
   }
 }
 
