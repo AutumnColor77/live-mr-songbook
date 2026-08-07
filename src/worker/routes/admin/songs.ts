@@ -7,6 +7,7 @@ import {
 import {
   mapSong,
   normalizeDonationAmount,
+  normalizeOriginalUrl,
   type AppEnv,
   type SongRow,
 } from "../../types";
@@ -37,6 +38,7 @@ songs.post("/songs", async (c) => {
     difficulty?: number | null;
     donationAmount?: number | null;
     thumbnail?: string | null;
+    originalUrl?: string | null;
     enabled?: boolean;
   };
   try {
@@ -55,6 +57,7 @@ songs.post("/songs", async (c) => {
   const genre = normalizeGenre(body.genre);
   const difficulty = normalizeDifficulty(body.difficulty);
   const donationAmount = normalizeDonationAmount(body.donationAmount);
+  const originalUrl = normalizeOriginalUrl(body.originalUrl);
   const tags = Array.isArray(body.tags) ? body.tags.map(String) : [];
   const now = Date.now();
   const id = newId("song");
@@ -66,8 +69,8 @@ songs.post("/songs", async (c) => {
   );
 
   await c.env.DB.prepare(
-    `INSERT INTO songs (id, channel_id, title, artist, category, genre, tags, song_key, bpm, difficulty, donation_amount, thumbnail, enabled, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO songs (id, channel_id, title, artist, category, genre, tags, song_key, bpm, difficulty, donation_amount, thumbnail, original_url, enabled, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   )
     .bind(
       id,
@@ -82,6 +85,7 @@ songs.post("/songs", async (c) => {
       difficulty,
       donationAmount,
       thumbnail,
+      originalUrl,
       body.enabled === false ? 0 : 1,
       now,
       now,
@@ -115,6 +119,7 @@ songs.patch("/songs/:id", async (c) => {
     difficulty: number | null;
     donationAmount: number | null;
     thumbnail: string | null;
+    originalUrl: string | null;
     enabled: boolean;
   }>;
   try {
@@ -155,12 +160,16 @@ songs.patch("/songs/:id", async (c) => {
           existing.thumbnail ?? "",
         )
       : (existing.thumbnail ?? "");
+  const originalUrl =
+    body.originalUrl !== undefined
+      ? normalizeOriginalUrl(body.originalUrl)
+      : (existing.original_url ?? null);
   const enabled =
     body.enabled !== undefined ? (body.enabled ? 1 : 0) : existing.enabled;
   const updatedAt = Date.now();
 
   await c.env.DB.prepare(
-    `UPDATE songs SET title = ?, artist = ?, category = ?, genre = ?, tags = ?, song_key = ?, bpm = ?, difficulty = ?, donation_amount = ?, thumbnail = ?, enabled = ?, updated_at = ?
+    `UPDATE songs SET title = ?, artist = ?, category = ?, genre = ?, tags = ?, song_key = ?, bpm = ?, difficulty = ?, donation_amount = ?, thumbnail = ?, original_url = ?, enabled = ?, updated_at = ?
      WHERE id = ? AND channel_id = ?`,
   )
     .bind(
@@ -174,6 +183,7 @@ songs.patch("/songs/:id", async (c) => {
       difficulty,
       donationAmount,
       thumbnail,
+      originalUrl,
       enabled,
       updatedAt,
       id,

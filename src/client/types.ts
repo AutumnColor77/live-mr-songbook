@@ -10,6 +10,7 @@ export type Song = {
   difficulty?: number | null;
   donationAmount?: number | null;
   thumbnail?: string;
+  originalUrl?: string | null;
 };
 
 export type SongRequest = {

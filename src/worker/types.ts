@@ -71,6 +71,7 @@ export type SongRow = {
   difficulty: number | null;
   donation_amount: number | null;
   thumbnail: string;
+  original_url?: string | null;
   enabled: number;
   created_at: number;
   updated_at: number;
@@ -104,6 +105,7 @@ export type Song = {
   difficulty: number | null;
   donationAmount: number | null;
   thumbnail: string;
+  originalUrl: string | null;
   enabled: boolean;
   createdAt: number;
   updatedAt: number;
@@ -156,6 +158,21 @@ export type SongRequest = {
   payAmount: number | null;
 };
 
+/** http(s) media URL for Pull (YouTube watch/youtu.be). Rejects local paths. */
+export function normalizeOriginalUrl(raw: unknown): string | null {
+  if (raw == null || raw === "") return null;
+  if (typeof raw !== "string") return null;
+  const value = raw.trim();
+  if (!value || value.length > 2048) return null;
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+    return value;
+  } catch {
+    return null;
+  }
+}
+
 /** Suggested tip amount in KRW (0 clears / null keeps unset). Cap 100_000_000. */
 export function normalizeDonationAmount(raw: unknown): number | null {
   if (raw == null || raw === "") return null;
@@ -195,6 +212,7 @@ export function mapSong(row: SongRow): Song {
         : null,
     donationAmount: donation,
     thumbnail: row.thumbnail ?? "",
+    originalUrl: row.original_url?.trim() ? row.original_url.trim() : null,
     enabled: row.enabled === 1,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
