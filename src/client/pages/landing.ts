@@ -187,7 +187,7 @@ export function mountLanding(
         }
       </main>
       <footer class="landing-footer">
-        <p>곡 관리는 <a href="https://github.com/AutumnColor77/Live-MR-Manager/releases" target="_blank" rel="noopener noreferrer">Live MR Manager (LMRM)</a>에서 합니다.</p>
+        <p>라이브 MR을 다루는 <a href="https://github.com/AutumnColor77/Live-MR-Manager/releases" target="_blank" rel="noopener noreferrer">Live MR Manager (LMRM)</a>도 사용해보세요.</p>
       </footer>
       ${loginPickerOverlayHtml(providers)}
       <div id="toast" class="toast" hidden></div>
