@@ -1,7 +1,7 @@
 {
   "name": "Live MR Songbook",
   "short_name": "Songbook",
-  "description": "시청자 노래 신청 노래책",
+  "description": "스트리머의 노래책에서 원하는 곡을 바로 신청하세요. 인터넷 방송용 시청자 신청 노래책입니다.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#08080a",
