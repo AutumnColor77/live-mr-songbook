@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /me
+Disallow: /me/
+Disallow: /c/*/admin
+Disallow: /c/*/admin/
+
+Sitemap: https://livemrsongbook.com/sitemap.xml

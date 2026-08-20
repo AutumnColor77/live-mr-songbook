@@ -15,6 +15,7 @@ import meRoutes from "./routes/me";
 import directory from "./routes/directory";
 import legacyGone from "./routes/legacy-gone";
 import media from "./routes/media";
+import sitemap from "./routes/sitemap";
 
 const app = new Hono<AppEnv>();
 
@@ -27,6 +28,7 @@ app.use(
 );
 
 app.get("/api/health", (c) => c.json({ ok: true, service: "live-mr-songbook" }));
+app.route("/sitemap.xml", sitemap);
 
 app.route("/api/auth", authRoutes);
 app.route("/api/me", meRoutes);
