@@ -19,6 +19,9 @@ import {
 } from "../theme";
 import { createToast } from "../toast";
 
+/** Hide the home directory until more channels exist. */
+const SHOW_LANDING_DIRECTORY = false;
+
 function channelCardHtml(ch: DirectoryChannel): string {
   const initial = escapeHtml(
     (ch.ownerName || ch.name || "?").trim().slice(0, 1).toUpperCase() || "?",
@@ -72,8 +75,12 @@ export function mountLanding(
   const authBlock = user
     ? `
       <div class="landing-hero-cta flex flex-col sm:flex-row gap-2.5 w-full max-w-md mx-auto">
-        <a href="#directory" class="primary-btn flex-1 text-center">노래책 둘러보기</a>
-        <a href="/me" class="secondary-btn flex-1 text-center">내 계정</a>
+        ${
+          SHOW_LANDING_DIRECTORY
+            ? `<a href="#directory" class="primary-btn flex-1 text-center">노래책 둘러보기</a>
+        <a href="/me" class="secondary-btn flex-1 text-center">내 계정</a>`
+            : `<a href="/me" class="primary-btn flex-1 text-center">내 계정</a>`
+        }
       </div>
     `
     : `
@@ -90,7 +97,11 @@ export function mountLanding(
         })}
       </div>
       <p class="landing-hero-note text-xs text-dim text-center leading-relaxed">
-        로그인 없이도 아래 노래책을 둘러보고 신청할 수 있어요.
+        ${
+          SHOW_LANDING_DIRECTORY
+            ? "로그인 없이도 아래 노래책을 둘러보고 신청할 수 있어요."
+            : "스트리머가 공유한 노래책 주소로 바로 신청할 수 있어요."
+        }
       </p>
     `;
 
@@ -122,7 +133,11 @@ export function mountLanding(
             <div class="landing-hero-copy">
               <h1 class="landing-hero-title">방송 중, 바로 신청</h1>
               <p class="landing-hero-support">
-                스트리머 노래책을 찾고 원하는 곡을 신청하세요.
+                ${
+                  SHOW_LANDING_DIRECTORY
+                    ? "스트리머 노래책을 찾고 원하는 곡을 신청하세요."
+                    : "스트리머가 공유한 노래책에서 원하는 곡을 신청하세요."
+                }
               </p>
             </div>
             ${
@@ -131,13 +146,19 @@ export function mountLanding(
                 : ""
             }
             ${authBlock}
-            <a href="#directory" class="landing-hero-scroll" aria-label="노래책 목록으로 이동">
+            ${
+              SHOW_LANDING_DIRECTORY
+                ? `<a href="#directory" class="landing-hero-scroll" aria-label="노래책 목록으로 이동">
               ${icons.chevronDown(22)}
-            </a>
+            </a>`
+                : ""
+            }
           </div>
         </section>
 
-        <div class="w-full max-w-3xl mx-auto px-4 sm:px-6 pb-12 pt-2">
+        ${
+          SHOW_LANDING_DIRECTORY
+            ? `<div class="w-full max-w-3xl mx-auto px-4 sm:px-6 pb-12 pt-2">
           <section id="directory" class="panel p-6 space-y-4 scroll-mt-24">
             <div class="flex items-end justify-between gap-3">
               <div class="text-left">
@@ -160,7 +181,9 @@ export function mountLanding(
               <p class="text-sm text-dim text-center py-6 w-full">불러오는 중…</p>
             </div>
           </section>
-        </div>
+        </div>`
+            : ""
+        }
       </main>
       ${loginPickerOverlayHtml(providers)}
       <div id="toast" class="toast" hidden></div>
@@ -184,6 +207,8 @@ export function mountLanding(
   if (feedback.toast) {
     toast.show(feedback.toast);
   }
+
+  if (!SHOW_LANDING_DIRECTORY) return;
 
   const listEl = $("#directory-list");
   const countEl = $("#directory-count");

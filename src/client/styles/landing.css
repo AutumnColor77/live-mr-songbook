@@ -131,6 +131,35 @@
   animation: landingRise 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.24s both;
 }
 
+.landing-hero-cta .primary-btn,
+.landing-hero-cta .secondary-btn {
+  min-height: 36px;
+  height: auto;
+  padding-block: 0.45rem;
+  font-size: 1rem;
+}
+
+@media (max-width: 639px) {
+  .landing-hero-cta {
+    align-items: center;
+  }
+
+  .landing-hero-cta .primary-btn,
+  .landing-hero-cta .secondary-btn {
+    width: 66%;
+    flex: none;
+  }
+}
+
+@media (min-width: 640px) {
+  .landing-hero-cta .primary-btn,
+  .landing-hero-cta .secondary-btn {
+    min-height: var(--btn-h-lg);
+    padding-block: 0;
+    font-size: 0.9rem;
+  }
+}
+
 .landing-hero-note {
   margin: 0;
   max-width: 20rem;

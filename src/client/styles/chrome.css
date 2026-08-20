@@ -480,6 +480,19 @@ a.secondary-btn {
   display: none;
 }
 
+@media (max-width: 639px) {
+  #login-picker .login-provider-btn,
+  #login-picker #login-picker-close {
+    display: flex;
+    width: 66%;
+    margin-inline: auto;
+    min-height: 35px;
+    height: auto;
+    padding-block: 0.4rem;
+    font-size: 1rem;
+  }
+}
+
 .sr-only {
   position: absolute;
   width: 1px;
