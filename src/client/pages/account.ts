@@ -149,6 +149,17 @@ export async function mountAccount(
             </form>
           </details>
 
+          ${
+            own
+              ? `<a
+            href="https://github.com/AutumnColor77/Live-MR-Manager/releases"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="block border-t border-glass-border pt-5 text-sm font-extrabold text-main text-center"
+          >LMRM 다운로드</a>`
+              : ""
+          }
+
           <details class="border-t border-glass-border pt-5">
             <summary class="cursor-pointer text-sm font-extrabold text-center list-none" style="color:#f87171">계정 탈퇴</summary>
             <form id="delete-account-form" class="mt-4 space-y-3 text-center">

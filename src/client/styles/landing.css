@@ -3,9 +3,9 @@
 .landing-hero {
   position: relative;
   display: flex;
+  flex: 1;
   align-items: center;
   justify-content: center;
-  min-height: calc(100dvh - 4rem);
   width: 100%;
   overflow: hidden;
   isolation: isolate;
@@ -215,6 +215,31 @@
     transform: translateY(6px);
     opacity: 0.9;
   }
+}
+
+.landing-footer {
+  flex-shrink: 0;
+  padding: 0.75rem 1.25rem 1.25rem;
+  text-align: center;
+  border-top: 1px solid var(--glass-border);
+}
+
+.landing-footer p {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+
+.landing-footer a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+.landing-footer a:hover {
+  color: var(--text-muted);
 }
 
 @media (min-width: 640px) {

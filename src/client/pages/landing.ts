@@ -124,7 +124,7 @@ export function mountLanding(
           </div>
         </div>
       </header>
-      <main class="flex-1 w-full">
+      <main class="flex-1 w-full flex flex-col">
         <section class="landing-hero" aria-label="소개">
           <div class="landing-hero-stage" aria-hidden="true"></div>
           <div class="landing-hero-inner">
@@ -186,6 +186,9 @@ export function mountLanding(
             : ""
         }
       </main>
+      <footer class="landing-footer">
+        <p>곡 관리는 <a href="https://github.com/AutumnColor77/Live-MR-Manager/releases" target="_blank" rel="noopener noreferrer">Live MR Manager (LMRM)</a>에서 합니다.</p>
+      </footer>
       ${loginPickerOverlayHtml(providers)}
       <div id="toast" class="toast" hidden></div>
     </div>
