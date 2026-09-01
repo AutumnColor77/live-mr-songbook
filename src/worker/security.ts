@@ -40,17 +40,33 @@ const CSP =
   "base-uri 'self'; " +
   "form-action 'self'";
 
+/** Workers Assets responses have immutable headers; copy before mutating. */
+export function withMutableHeaders(res: Response): Response {
+  return new Response(res.body, res);
+}
+
+export function patchResponseHeaders(c: Context, patch: (headers: Headers) => void): void {
+  const headers = new Headers(c.res.headers);
+  patch(headers);
+  c.res = new Response(c.res.body, {
+    status: c.res.status,
+    statusText: c.res.statusText,
+    headers,
+  });
+}
+
 export const securityHeaders: MiddlewareHandler<AppEnv> = async (c, next) => {
   await next();
-  const headers = c.res.headers;
-  headers.set("X-Content-Type-Options", "nosniff");
-  headers.set("X-Frame-Options", "DENY");
-  headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
-  headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
-  headers.set("Content-Security-Policy", CSP);
-  if (new URL(c.req.url).protocol === "https:") {
-    headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
-  }
+  patchResponseHeaders(c, (headers) => {
+    headers.set("X-Content-Type-Options", "nosniff");
+    headers.set("X-Frame-Options", "DENY");
+    headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+    headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+    headers.set("Content-Security-Policy", CSP);
+    if (new URL(c.req.url).protocol === "https:") {
+      headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+    }
+  });
 };
 
 export function rateLimitByIp(

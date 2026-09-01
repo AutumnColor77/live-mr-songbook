@@ -1,6 +1,7 @@
 import type { Context, MiddlewareHandler, Next } from "hono";
 import { appendVaryAccept, prefersMarkdown } from "./accept";
 import { SLUG_RE } from "./crypto";
+import { patchResponseHeaders } from "./security";
 import type { AppEnv, ChannelRow } from "./types";
 
 const SITE_TITLE = "Live MR Songbook — 라이브 방송용 신청 노래책";
@@ -372,5 +373,5 @@ export const markdownNegotiate: MiddlewareHandler<AppEnv> = async (c, next: Next
   }
 
   await next();
-  appendVaryAccept(c.res.headers);
+  patchResponseHeaders(c, appendVaryAccept);
 };

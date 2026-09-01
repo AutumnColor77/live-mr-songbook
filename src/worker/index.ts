@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { loadChannel } from "./auth";
 import { runMaintenance } from "./maintenance";
 import { markdownNegotiate } from "./markdown-negotiate";
-import { apiCors, rateLimitByIp, securityHeaders } from "./security";
+import { apiCors, rateLimitByIp, securityHeaders, withMutableHeaders } from "./security";
 import type { AppEnv, Bindings } from "./types";
 import songs from "./routes/songs";
 import status from "./routes/status";
@@ -53,11 +53,12 @@ app.route("/api/c/:slug", channelApi);
 
 app.route("/api", legacyGone);
 
-app.notFound((c) => {
+app.notFound(async (c) => {
   if (c.req.path.startsWith("/api/")) {
     return c.json({ error: "Not found" }, 404);
   }
-  return c.env.ASSETS.fetch(c.req.raw);
+  const res = await c.env.ASSETS.fetch(c.req.raw);
+  return withMutableHeaders(res);
 });
 
 async function scheduled(
