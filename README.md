@@ -239,7 +239,7 @@ Live MR Manager 톤앤매너 + 브랜드 에셋(`public/icon-*.png`, `logo-on-*.
 
 ## Deploy
 
-`main` 브랜치에 push하면 GitHub Actions가 `npm ci` → `npm run typecheck` → `npm run deploy`를 실행합니다 (`.github/workflows/deploy.yml`). 로컬 검증은 `npm test`(bulk sync)와 `npm run typecheck`.
+`main` 브랜치에 push하면 GitHub Actions(Node 24)가 `npm ci` → `npm run typecheck` → `npm run deploy`를 실행합니다 (`.github/workflows/deploy.yml`). 로컬 검증은 `npm test`(bulk sync)와 `npm run typecheck`.
 
 저장소 **Settings → Secrets and variables → Actions**에 아래 시크릿을 등록하세요.
 
