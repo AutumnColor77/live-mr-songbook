@@ -2,7 +2,7 @@
 
 시청자용 멀티채널 노래책 — Cloudflare Workers (Hono) + D1 + Vite/Tailwind.
 
-Live MR Manager와는 **별도 리포**입니다. 스트리머는 소셜 로그인으로 본인 채널을 만들고, Manager 앱에서 라이브러리를 **Push** 동기화합니다. 홈(`/`)에서 등록된 노래책 목록을 비로그인으로 둘러볼 수 있고, 시청자 로그인 후 같은 홈으로 복귀합니다. 개별 노래책(`/c/:slug`)에서도 선택 로그인이 가능합니다(프로필 강제 설정 없음).
+Live MR Manager와는 **별도 리포**입니다. 스트리머는 소셜 로그인으로 본인 채널을 만들고, Manager 앱에서 라이브러리를 **Push**합니다 (`PUT /api/c/:slug/admin/songs/sync`, 구버전은 단건 POST/PATCH). 홈(`/`)에서 등록된 노래책 목록을 비로그인으로 둘러볼 수 있고, 시청자 로그인 후 같은 홈으로 복귀합니다. 개별 노래책(`/c/:slug`)에서도 선택 로그인이 가능합니다(프로필 강제 설정 없음).
 
 로드맵·미완 작업은 [`TODO.md`](TODO.md)를 보세요. 치지직 도네·유료 신청 설계는 [`docs/chzzk-paid-requests.md`](docs/chzzk-paid-requests.md).
 
@@ -23,6 +23,7 @@ Live MR Manager와는 **별도 리포**입니다. 스트리머는 소셜 로그�
 | API | Hono on Cloudflare Workers |
 | DB | Cloudflare D1 (SQLite) |
 | UI | Vite + TypeScript + Tailwind CSS v4 |
+| Test | Vitest + `@cloudflare/vitest-pool-workers` |
 | Deploy | Cloudflare Workers + Assets |
 
 ## Quick start (local)
@@ -33,6 +34,7 @@ cp .dev.vars.example .dev.vars   # PLATFORM_ADMIN_TOKEN + Google/Naver OAuth
 npm run db:pull                  # 프로덕션 D1 → 로컬 복사 (권장)
 # 또는 빈 로컬 DB: npm run db:migrate:local
 npm run dev
+npm test                         # bulk songs sync 통합 테스트
 ```
 
 프로덕션 DB를 로컬에서 쓰려면 Cloudflare에 로그인된 상태에서:
@@ -90,7 +92,7 @@ npx wrangler secret put CHZZK_CLIENT_SECRET
 
 - **channels** — `slug`, `name`, `admin_token_hash`
 - **channel_members** — 사용자↔채널 역할(`admin` 등). 로그인 사용자는 **본인 채널 1개**
-- **songs** — `title`, `artist`, `category`(큐레이션), `genre`, `tags`, `song_key`, `bpm`, `difficulty`(1–5), `thumbnail`(http(s)·managed `/api/media/thumbs/...`·또는 압축 data URL), `original_url`(유튜브 등 http(s), Pull용), `enabled`
+- **songs** — `title`, `artist`, `category`(큐레이션), `genre`, `tags`, `song_key`, `bpm`, `difficulty`(1–5), `thumbnail`(http(s)·managed `/api/media/thumbs/...`·또는 압축 data URL), `original_url`(유튜브 등 http(s), Pull용), `enabled`. Manager Push 매칭 키는 title+artist(`trim` → 공백 축소 → lower). DB UNIQUE는 없음.
 - **requests / settings** — 채널 스코프 대기열·신청 수락·Now Playing
 - **users / sessions** — Google/Naver 계정, HttpOnly `sb_session` 쿠키
 - 시청자: 홈 디렉터리에서 노래책 탐색·선택 로그인  
@@ -237,7 +239,7 @@ Live MR Manager 톤앤매너 + 브랜드 에셋(`public/icon-*.png`, `logo-on-*.
 
 ## Deploy
 
-`main` 브랜치에 push하면 GitHub Actions가 자동으로 `npm run deploy`를 실행합니다 (`.github/workflows/deploy.yml`).
+`main` 브랜치에 push하면 GitHub Actions가 `npm ci` → `npm run typecheck` → `npm run deploy`를 실행합니다 (`.github/workflows/deploy.yml`). 로컬 검증은 `npm test`(bulk sync)와 `npm run typecheck`.
 
 저장소 **Settings → Secrets and variables → Actions**에 아래 시크릿을 등록하세요.
 

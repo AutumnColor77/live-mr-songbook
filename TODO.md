@@ -36,10 +36,10 @@
 
 ## 4. Manager 연동
 
-- [x] Push 동기화(신규 POST / 기존 PATCH)
+- [x] Push 동기화 — 서버 `PUT /api/c/:slug/admin/songs/sync` bulk upsert (단건 POST/PATCH 하위 호환, 앱 fallback)
 - [x] 장르·카테고리·태그·키·BPM·난이도 전송
 - [x] 썸네일 http(s) + 로컬→JPEG data URL
-- [x] Push 시 로컬에 없는 곡 `enabled=false`(웹 숨김)
+- [x] Push 시 로컬에 없는 곡 `enabled=false`(웹 숨김, hard delete 아님)
 - [x] 대기열 `sort_order` + `POST /admin/queue/reorder` (앱·웹 운영 드래그 동기화)
 - [ ] Pull(Songbook → Manager 라이브러리)
 - [ ] 원격 hard-delete·ID 기반 양방향 정합
@@ -60,7 +60,8 @@
 - [x] D1 마이그레이션·`npm run deploy` 파이프라인
 - [x] README를 현재 기능에 맞게 정리
 - [x] 치지직 채팅·도네 신청 설계 메모 ([docs/chzzk-paid-requests.md](docs/chzzk-paid-requests.md))
-- [ ] API/E2E 테스트 최소 세트
+- [x] API 테스트 최소 세트 (`npm test` — `PUT .../admin/songs/sync` 100곡·skip·disable·검증·POST 회귀)
+- [ ] 웹 E2E·나머지 admin API 테스트
 - [ ] README·API 표를 코드와 주기적으로 맞추기
 
 ## 7. 치지직 채팅·도네 신청곡

@@ -60,6 +60,7 @@ sequenceDiagram
 - 본문: 첫 `-`(하이픈)을 기준으로 `artist` | `title` 분리. 제목에 `-`가 있으면 **첫 구분자만** artist 쪽 경계로 쓰거나, UI가 복사할 때 artist/title에 하이픈이 있으면 대체 구분자(예: ` — `)를 쓰는 옵션을 둠.
 - 정규화: trim, 연속 공백 축소, 유니코드 NFKC, 비교 시 대소문자 무시(영문).
 - 매칭: 해당 채널 `songs` 중 `enabled=1` 이고 정규화한 `artist`·`title`이 일치하는 행.  
+  (채팅/도네 매칭은 NFKC. Manager 라이브러리 Push 키는 NFKC 없이 trim·공백 축소·lower — `PUT /api/c/:slug/admin/songs/sync`, [`src/worker/song-key.ts`](../src/worker/song-key.ts).)  
   - 0건 → 무시/거절 로그  
   - 2건 이상(동명곡) → 거절 또는 `external_id`/우선순위 규칙 (채널 옵션으로 완화 가능, 1차는 exact 1건만 수락)
 - 유료: `payAmount >= request_price_krw` (원 단위; UI는 치즈 개수 표기). 미달 시 대기열 미등록.
