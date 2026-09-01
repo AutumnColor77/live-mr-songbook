@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { loadChannel } from "./auth";
 import { runMaintenance } from "./maintenance";
+import { markdownNegotiate } from "./markdown-negotiate";
 import { apiCors, rateLimitByIp, securityHeaders } from "./security";
 import type { AppEnv, Bindings } from "./types";
 import songs from "./routes/songs";
@@ -20,6 +21,7 @@ import sitemap from "./routes/sitemap";
 const app = new Hono<AppEnv>();
 
 app.use("*", securityHeaders);
+app.use("*", markdownNegotiate);
 app.use("/api/*", apiCors());
 
 app.get("/api/health", (c) => c.json({ ok: true, service: "live-mr-songbook" }));

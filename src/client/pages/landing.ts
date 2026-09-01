@@ -70,7 +70,7 @@ export function mountLanding(
   feedback: { toast?: string; errorNotice?: string } = {},
 ) {
   applyTheme(currentTheme());
-  document.title = "Live MR Songbook — 시청자 노래 신청 노래책";
+  document.title = "Live MR Songbook — 라이브 방송용 신청 노래책";
   const toast = createToast(root);
 
   const authBlock = user
