@@ -137,6 +137,7 @@ npx wrangler secret put CHZZK_CLIENT_SECRET
 | Method | Path |
 |--------|------|
 | `GET/POST` | `/api/c/:slug/admin/songs` |
+| `PUT` | `/api/c/:slug/admin/songs/sync` body `{ songs, disableMissing? }` (아래 bulk upsert) |
 | `PATCH/DELETE` | `/api/c/:slug/admin/songs/:id` |
 | `GET` | `/api/c/:slug/admin/requests` |
 | `PATCH` | `/api/c/:slug/admin/requests/:id` body `{ status }` |
@@ -169,13 +170,66 @@ Manager 앱에서 Songbook에 로그인한 뒤 라이브러리를 **Push / Pull*
 - 본인 채널만 대상. 없으면 `/api/me/channels`로 생성 유도
 - 곡 메타: 제목·아티스트·장르·카테고리·태그·키·BPM·난이도·후원금액·썸네일·`original_url`(유튜브 등)
 - 썸네일: `http(s)` URL 유지, 로컬 이미지는 JPEG data URL로 압축 업로드 후 Worker가 KV에 저장하고 `/api/media/thumbs/...` 경로로 서빙
-- 기존 곡은 title+artist 키로 PATCH
-- 로컬에 없는 원격 곡은 Push 시 `enabled=false`(공개 목록 숨김)
+- Push는 **bulk sync API를 우선** 사용하고, `404`/`501`이면 기존 단건 POST/PATCH loop로 fallback
+- 기존 곡은 title+artist 키(`trim` → 공백 축소 → lower)로 매칭
+- 로컬에 없는 원격 곡은 Push 시 `enabled=false`(공개 목록 숨김, hard delete 아님)
 - Pull: Manager가 admin songs를 가져와 로컬 라이브러리에 추가·갱신 (`original_url` → youtube, 없으면 플레이스홀더)
 - 웹 Admin 「재생」(`status=playing`) → Manager 폴러가 로컬 매칭 곡 재생
 - 신청 대기열 순서는 `sort_order` — Manager 신청목록·웹 admin 드래그 → `POST .../queue/reorder`
 
 구현 위치(Manager 리포): `src/js/songbook-sync.js`, `songbook-requests.js`, `songbook-request-poller.js`, `songbook-thumbnail.js`, 데스크톱 OAuth/세션 스토어.
+
+### Bulk upsert `PUT /api/c/:slug/admin/songs/sync`
+
+인증은 다른 admin API와 동일 (`Authorization: Bearer <session_token | channel_admin_token>`). `demo` 채널은 `403`. 요청당 최대 500곡, body 50MB 초과는 `413`. 기존 단건 `GET/POST/PATCH`는 변경 없음.
+
+Request:
+
+```json
+{
+  "songs": [
+    {
+      "title": "Dynamite",
+      "artist": "BTS",
+      "category": "인기",
+      "genre": "K-POP",
+      "tags": ["신나는"],
+      "songKey": "Ab",
+      "bpm": 114,
+      "difficulty": 3,
+      "donationAmount": null,
+      "thumbnail": "https://example.com/thumb.jpg",
+      "originalUrl": "https://www.youtube.com/watch?v=example",
+      "enabled": true
+    }
+  ],
+  "disableMissing": true
+}
+```
+
+- `title` 빈 문자열 → 해당 항목 skip (에러 아님). `artist` 생략/빈 값 → `"Unknown"`.
+- 채널 내 `(normalizedTitle, normalizedArtist)` 로 lookup. 없으면 INSERT, 있으면 필드 비교 후 UPDATE 또는 skip. push 시 `enabled`는 항상 `true`.
+- `disableMissing: true`이면 이번 payload 키에 없는 **현재 enabled** 곡만 `enabled=false`. DELETE 금지.
+- 썸네일: `http(s)` URL, JPEG data URL(`data:image/jpeg;base64,...`, 최대 80,000자), 또는 이미 저장된 `/api/media/thumbs/...`. 초과 data URL은 해당 항목 fail.
+- `originalUrl`은 `http(s)`만. 로컬 경로(`C:\...`, `/Users/...`)는 해당 항목 fail.
+- 항목 검증 실패는 나머지 곡을 적용한 뒤 **200** + `failed`/`errors`. JSON 오류는 `400`, 배열 오류는 `422`, 미인증 `401`, 채널 없음 `404`.
+
+Response (`200`):
+
+```json
+{
+  "added": 12,
+  "updated": 5,
+  "skipped": 83,
+  "disabled": 2,
+  "failed": 0,
+  "errors": []
+}
+```
+
+부분 실패 시 `errors`: `{ "index": 42, "title": "...", "artist": "...", "message": "thumbnail too large" }`.
+
+`POST /api/c/:slug/admin/songs/compare` (변경분 delta)는 아직 없습니다. Manager는 전체 라이브러리를 sync body에 넣고, 서버가 skip합니다.
 
 ## Design
 

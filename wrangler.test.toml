@@ -1,0 +1,25 @@
+name = "live-mr-songbook-test"
+compatibility_date = "2025-10-11"
+compatibility_flags = ["nodejs_compat"]
+main = "./src/worker/index.ts"
+
+[vars]
+PLATFORM_ADMIN_TOKEN = "test-platform-token-16chars"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "live-mr-songbook-test"
+database_id = "00000000-0000-0000-0000-000000000001"
+migrations_dir = "migrations"
+
+[[kv_namespaces]]
+binding = "THUMB_KV"
+id = "00000000-0000-0000-0000-000000000002"
+
+[[durable_objects.bindings]]
+name = "CHZZK_SESSION"
+class_name = "ChzzkSessionDO"
+
+[[migrations]]
+tag = "chzzk-session-v1"
+new_sqlite_classes = ["ChzzkSessionDO"]
