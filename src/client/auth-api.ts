@@ -156,9 +156,12 @@ export async function updateProfile(input: {
   return user;
 }
 
-export async function fetchDesktopHandoff(): Promise<{ deepLink: string; user: AuthUser }> {
+export async function fetchDesktopHandoff(
+  appState?: string | null,
+): Promise<{ deepLink: string; user: AuthUser }> {
+  const q = appState ? `?state=${encodeURIComponent(appState)}` : "";
   const data = await fetchJson<{ deepLink: string; user: AuthUser }>(
-    "/api/auth/desktop-handoff",
+    `/api/auth/desktop-handoff${q}`,
   );
   const user = normalizeUser(data.user);
   if (!user || !data.deepLink) throw new Error("앱 연동에 실패했습니다.");

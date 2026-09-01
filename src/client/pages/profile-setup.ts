@@ -11,6 +11,7 @@ export async function mountProfileSetup(root: HTMLElement, user: AuthUser): Prom
   const params = new URLSearchParams(location.search);
   const nextPath = safeNextPath("/me");
   const isDesktop = params.get("client") === "desktop";
+  const desktopState = params.get("state");
 
   root.innerHTML = `
     <div class="relative z-10 min-h-screen flex flex-col">
@@ -38,7 +39,7 @@ export async function mountProfileSetup(root: HTMLElement, user: AuthUser): Prom
     form: $("#profile-setup-form") as HTMLFormElement,
     onSaved: async () => {
       if (isDesktop) {
-        const { deepLink } = await fetchDesktopHandoff();
+        const { deepLink } = await fetchDesktopHandoff(desktopState);
         location.replace(deepLink);
         return;
       }

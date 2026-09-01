@@ -15,6 +15,7 @@ export function desktopDoneHtml(code: string): string {
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="refresh" content="0;url=${safeLink}" />
   <title>Live MR Manager 로그인</title>
   <style>
     body { font-family: system-ui, sans-serif; background:#0b0b10; color:#f8fafc;
@@ -28,23 +29,18 @@ export function desktopDoneHtml(code: string): string {
 </head>
 <body>
   <div class="card">
-    <h1 style="font-size:1.1rem;margin:0 0 8px">앱으로 돌아가는 중…</h1>
+    <h1 style="font-size:1.1rem;margin:0 0 8px">앱으로 로그인하는 중…</h1>
     <p style="color:#94a3b8;font-size:.9rem;line-height:1.5;margin:0 0 16px">
-      브라우저에서 “Live MR Manager 열기”를 허용해 주세요.<br />
-      앱이 열리면 이 창을 닫아도 됩니다.
+      Live MR Manager가 곧 로그인됩니다. 이 창은 닫아도 됩니다.<br />
+      브라우저가 앱 열기를 물으면 허용해 주세요.
     </p>
     <p style="font-size:.85rem;margin:0">
-      <a id="deep" href="${safeLink}">앱이 안 열리면 여기를 클릭</a>
+      <a id="deep" href="${safeLink}">앱 창을 앞으로 가져오려면 여기</a>
     </p>
     <button type="button" id="close-btn">창 닫기</button>
   </div>
   <script>
     (function () {
-      var link = ${JSON.stringify(deepLink)};
-      // Trigger custom-protocol handoff once — retries open duplicate OS prompts.
-      try { window.location.replace(link); } catch (e) {
-        try { window.location.href = link; } catch (e2) {}
-      }
       var btn = document.getElementById("close-btn");
       if (btn) btn.addEventListener("click", function () {
         try { window.close(); } catch (e) {}

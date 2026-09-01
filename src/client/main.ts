@@ -104,15 +104,18 @@ async function boot() {
     const { toast, errorNotice } = consumeAuthQuery();
     const params = new URLSearchParams(location.search);
     const isDesktop = params.get("client") === "desktop";
+    const desktopState = params.get("state");
     const [user, status] = await Promise.all([fetchMe(), fetchAuthStatus()]);
     // Desktop Manager still requires profile setup before handoff.
     if (isDesktop && user?.needsProfileSetup) {
-      location.replace(`/me/setup?${new URLSearchParams({ next: "/me", client: "desktop" })}`);
+      const setup = new URLSearchParams({ next: "/me", client: "desktop" });
+      if (desktopState) setup.set("state", desktopState);
+      location.replace(`/me/setup?${setup}`);
       return;
     }
     if (isDesktop && user) {
       try {
-        const { deepLink } = await fetchDesktopHandoff();
+        const { deepLink } = await fetchDesktopHandoff(desktopState);
         location.replace(deepLink);
         return;
       } catch (err) {

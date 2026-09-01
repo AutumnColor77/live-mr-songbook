@@ -46,6 +46,7 @@ export type SignedOAuthState = {
   next: string;
   client: "web" | "desktop";
   provider: OAuthProvider;
+  appState?: string;
 };
 
 /** Self-contained OAuth state (no D1 required to validate). */
@@ -54,6 +55,7 @@ export async function signOAuthState(
   next: string,
   client: "web" | "desktop" = "web",
   provider: OAuthProvider = "google",
+  appState?: string | null,
   ttlMs = 1000 * 60 * 10,
 ): Promise<string> {
   const payload: SignedOAuthState = {
@@ -63,6 +65,9 @@ export async function signOAuthState(
     client,
     provider,
   };
+  if (appState && /^[a-zA-Z0-9]{16,64}$/.test(appState)) {
+    payload.appState = appState;
+  }
   const body = bytesToBase64Url(new TextEncoder().encode(JSON.stringify(payload)));
   const sig = await hmacSha256Base64Url(secret, body);
   return `${body}.${sig}`;
@@ -88,6 +93,14 @@ export async function verifyOAuthState(
     if (typeof payload.next !== "string") return null;
     if (payload.client !== "desktop") payload.client = "web";
     if (payload.provider !== "naver") payload.provider = "google";
+    if (
+      typeof payload.appState === "string" &&
+      /^[a-zA-Z0-9]{16,64}$/.test(payload.appState)
+    ) {
+      /* keep */
+    } else {
+      delete payload.appState;
+    }
     return payload;
   } catch {
     return null;

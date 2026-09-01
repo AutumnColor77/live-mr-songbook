@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
-import { createDesktopHandoffCode } from "../../desktop-handoff";
+import { createDesktopHandoffCode, sanitizeDesktopAppState } from "../../desktop-handoff";
 import { signOAuthState, verifyOAuthState, type OAuthProvider } from "../../crypto";
 import { createSession, setOAuthStateCookie, upsertOAuthUser } from "../../session";
 import type { AppEnv } from "../../types";
@@ -28,12 +28,19 @@ export async function beginOAuth(
   provider: OAuthProvider,
   nextPath: string,
   client: "web" | "desktop",
+  appState?: string | null,
 ): Promise<{ url: string }> {
   const secret = oauthStateSecretForProvider(c.env, provider);
   if (!secret) {
     throw new Error(`${provider} OAuth is not configured`);
   }
-  const state = await signOAuthState(secret, nextPath, client, provider);
+  const state = await signOAuthState(
+    secret,
+    nextPath,
+    client,
+    provider,
+    sanitizeDesktopAppState(appState),
+  );
   setOAuthStateCookie(c, state);
   const redirectUri = `${originFromRequest(c.req.url)}${callbackPath(provider)}`;
 
@@ -214,9 +221,10 @@ async function finishOAuthLogin(
     await createSession(c, user.id);
 
     const needsSetup = !user.profile_setup_done;
-    const setupPath = `/me/setup?next=${encodeURIComponent(nextPath)}${
-      client === "desktop" ? "&client=desktop" : ""
-    }`;
+    const setupParams = new URLSearchParams({ next: nextPath });
+    if (client === "desktop") setupParams.set("client", "desktop");
+    if (payload.appState) setupParams.set("state", payload.appState);
+    const setupPath = `/me/setup?${setupParams}`;
 
     console.log("[auth] login ok", {
       userId: user.id,
@@ -233,7 +241,7 @@ async function finishOAuthLogin(
     }
 
     if (client === "desktop") {
-      const code = await createDesktopHandoffCode(c.env.DB, user.id);
+      const code = await createDesktopHandoffCode(c.env.DB, user.id, payload.appState);
       return { ok: true, mode: "desktop", code };
     }
     return { ok: true, mode: "web", redirect: successRedirect(nextPath) };
@@ -255,7 +263,7 @@ export function registerProviderRoutes(auth: Hono<AppEnv>, provider: OAuthProvid
     }
     const nextPath = safeNextPath(c.req.query("next"));
     const client = parseClient(c.req.query("client"));
-    const { url } = await beginOAuth(c, provider, nextPath, client);
+    const { url } = await beginOAuth(c, provider, nextPath, client, c.req.query("state"));
     return c.redirect(url);
   });
 
@@ -265,7 +273,7 @@ export function registerProviderRoutes(auth: Hono<AppEnv>, provider: OAuthProvid
     }
     const nextPath = safeNextPath(c.req.query("next"));
     const client = parseClient(c.req.query("client"));
-    return c.json(await beginOAuth(c, provider, nextPath, client));
+    return c.json(await beginOAuth(c, provider, nextPath, client, c.req.query("state")));
   });
 
   auth.get(`/${provider}/callback`, async (c) => {

@@ -73,8 +73,9 @@ npx wrangler secret put CHZZK_CLIENT_SECRET
 
 설정이 비어 있으면 해당 로그인 버튼은 사용할 수 없습니다 (`GET /api/auth/status`).
 
-**데스크톱(Manager)** deep-link: `live-mr-manager://oauth/callback?token=…`  
-브라우저 세션 재사용: `GET /api/auth/desktop-connect`, 핸드오프: `GET /api/auth/desktop-handoff`.
+**데스크톱(Manager)** deep-link: `live-mr-manager://oauth/callback?code=…`  
+앱은 `POST /api/auth/desktop-exchange`로 일회용 `code`(또는 로그인 시작 때 넘긴 `state`)를 세션 토큰과 교환합니다.  
+브라우저 세션 재사용: `GET /api/auth/desktop-connect?provider=&next=&state=`, 핸드오프: `GET /api/auth/desktop-handoff`.
 
 ## 치지직 실시간 (채팅·후원)
 
@@ -110,8 +111,9 @@ npx wrangler secret put CHZZK_CLIENT_SECRET
 | `POST` | `/api/auth/{google\|naver}/exchange` | SPA code 교환 |
 | `GET` | `/api/auth/me` | `{ user, channels }` |
 | `PATCH` | `/api/auth/profile` | 닉네임·아바타 |
-| `GET` | `/api/auth/desktop-connect` | 앱 로그인 (`?provider=&next=`) |
-| `GET` | `/api/auth/desktop-handoff` | 세션 → deep-link 토큰 |
+| `GET` | `/api/auth/desktop-connect` | 앱 로그인 (`?provider=&next=&state=`) |
+| `GET` | `/api/auth/desktop-handoff` | 세션 → deep-link `code` (`?state=` 선택) |
+| `POST` | `/api/auth/desktop-exchange` | `{ code }` 또는 `{ state }` → `{ token }` |
 | `GET` | `/api/auth/status` | `{ googleEnabled, naverEnabled }` |
 | `POST` | `/api/auth/logout` | 세션 삭제 |
 
