@@ -1,5 +1,6 @@
 import type { Context, Next } from "hono";
 import { bearerToken, sha256Hex, SLUG_RE } from "./crypto";
+import { secureCompare } from "./secure-compare";
 import { loadUserFromSession } from "./session";
 import type { AppEnv, ChannelRow } from "./types";
 
@@ -68,11 +69,11 @@ export async function requireChannelAdmin(c: Context<AppEnv>, next: Next) {
 export async function requirePlatformAdmin(c: Context<AppEnv>, next: Next) {
   const expected = c.env.PLATFORM_ADMIN_TOKEN;
   if (!expected) {
-    return c.json({ error: "Platform admin token not configured" }, 500);
+    return c.json({ error: "Service unavailable" }, 503);
   }
 
   const provided = bearerToken(c.req.header("Authorization"));
-  if (!provided || provided !== expected) {
+  if (!provided || !secureCompare(provided, expected)) {
     return c.json({ error: "Unauthorized" }, 401);
   }
 

@@ -15,7 +15,7 @@ async function unlinkChzzkBestEffort(
 ): Promise<void> {
   try {
     await stopChzzkSession(env, channelId);
-    const link = await getChzzkLink(env.DB, channelId);
+    const link = await getChzzkLink(env.DB, channelId, env);
     if (link && chzzkConfigured(env)) {
       await revokeChzzkToken({
         clientId: env.CHZZK_CLIENT_ID!,

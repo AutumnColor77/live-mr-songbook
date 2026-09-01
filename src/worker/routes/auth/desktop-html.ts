@@ -1,7 +1,11 @@
 import { DESKTOP_SCHEME } from "./helpers";
 
-export function desktopDoneHtml(token: string): string {
-  const deepLink = `${DESKTOP_SCHEME}://oauth/callback?token=${encodeURIComponent(token)}`;
+export function desktopDeepLink(code: string): string {
+  return `${DESKTOP_SCHEME}://oauth/callback?code=${encodeURIComponent(code)}`;
+}
+
+export function desktopDoneHtml(code: string): string {
+  const deepLink = desktopDeepLink(code);
   const safeLink = deepLink
     .replace(/&/g, "&amp;")
     .replace(/"/g, "&quot;")

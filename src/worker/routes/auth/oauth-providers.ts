@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
+import { createDesktopHandoffCode } from "../../desktop-handoff";
 import { signOAuthState, verifyOAuthState, type OAuthProvider } from "../../crypto";
 import { createSession, setOAuthStateCookie, upsertOAuthUser } from "../../session";
 import type { AppEnv } from "../../types";
@@ -14,7 +15,7 @@ import {
   NAVER_USERINFO_URL,
   callbackPath,
   errorRedirect,
-  oauthStateSecret,
+  oauthStateSecretForProvider,
   originFromRequest,
   parseClient,
   providerConfigured,
@@ -28,7 +29,11 @@ export async function beginOAuth(
   nextPath: string,
   client: "web" | "desktop",
 ): Promise<{ url: string }> {
-  const state = await signOAuthState(oauthStateSecret(c.env), nextPath, client, provider);
+  const secret = oauthStateSecretForProvider(c.env, provider);
+  if (!secret) {
+    throw new Error(`${provider} OAuth is not configured`);
+  }
+  const state = await signOAuthState(secret, nextPath, client, provider);
   setOAuthStateCookie(c, state);
   const redirectUri = `${originFromRequest(c.req.url)}${callbackPath(provider)}`;
 
@@ -57,7 +62,7 @@ export async function beginOAuth(
 
 type FinishResult =
   | { ok: true; mode: "web"; redirect: string }
-  | { ok: true; mode: "desktop"; token: string }
+  | { ok: true; mode: "desktop"; code: string }
   | { ok: true; mode: "desktop-setup"; redirect: string }
   | { ok: false; reason: string };
 
@@ -78,7 +83,7 @@ async function exchangeGoogleProfile(
     }),
   });
   if (!tokenRes.ok) {
-    console.error("[auth] google token failed", await tokenRes.text());
+    console.error("[auth] google token failed", tokenRes.status);
     return { error: "token_exchange" };
   }
   const tokenJson = (await tokenRes.json()) as { access_token?: string };
@@ -88,7 +93,7 @@ async function exchangeGoogleProfile(
     headers: { Authorization: `Bearer ${tokenJson.access_token}` },
   });
   if (!profileRes.ok) {
-    console.error("[auth] google userinfo failed", await profileRes.text());
+    console.error("[auth] google userinfo failed", profileRes.status);
     return { error: "userinfo" };
   }
   const profile = (await profileRes.json()) as {
@@ -123,7 +128,7 @@ async function exchangeNaverProfile(
 
   const tokenRes = await fetch(tokenUrl.toString(), { method: "GET" });
   if (!tokenRes.ok) {
-    console.error("[auth] naver token failed", await tokenRes.text());
+    console.error("[auth] naver token failed", tokenRes.status);
     return { error: "token_exchange" };
   }
   const tokenJson = (await tokenRes.json()) as {
@@ -132,7 +137,7 @@ async function exchangeNaverProfile(
     error_description?: string;
   };
   if (!tokenJson.access_token) {
-    console.error("[auth] naver token missing", tokenJson);
+    console.error("[auth] naver token missing access_token", tokenJson.error ?? "unknown");
     return { error: "token_exchange" };
   }
 
@@ -140,7 +145,7 @@ async function exchangeNaverProfile(
     headers: { Authorization: `Bearer ${tokenJson.access_token}` },
   });
   if (!profileRes.ok) {
-    console.error("[auth] naver userinfo failed", await profileRes.text());
+    console.error("[auth] naver userinfo failed", profileRes.status);
     return { error: "userinfo" };
   }
   const body = (await profileRes.json()) as {
@@ -170,7 +175,11 @@ async function finishOAuthLogin(
   code: string,
   state: string,
 ): Promise<FinishResult> {
-  const payload = await verifyOAuthState(oauthStateSecret(c.env), state);
+  const secret = oauthStateSecretForProvider(c.env, provider);
+  if (!secret) {
+    return { ok: false, reason: "not_configured" };
+  }
+  const payload = await verifyOAuthState(secret, state);
   if (!payload || payload.provider !== provider) {
     console.error("[auth] invalid signed state", { provider, payloadProvider: payload?.provider });
     return { ok: false, reason: "invalid_state" };
@@ -202,7 +211,7 @@ async function finishOAuthLogin(
       picture: profile.picture,
     });
 
-    const sessionToken = await createSession(c, user.id);
+    await createSession(c, user.id);
 
     const needsSetup = !user.profile_setup_done;
     const setupPath = `/me/setup?next=${encodeURIComponent(nextPath)}${
@@ -224,7 +233,8 @@ async function finishOAuthLogin(
     }
 
     if (client === "desktop") {
-      return { ok: true, mode: "desktop", token: sessionToken };
+      const code = await createDesktopHandoffCode(c.env.DB, user.id);
+      return { ok: true, mode: "desktop", code };
     }
     return { ok: true, mode: "web", redirect: successRedirect(nextPath) };
   } catch (err) {
@@ -279,7 +289,7 @@ export function registerProviderRoutes(auth: Hono<AppEnv>, provider: OAuthProvid
     const result = await finishOAuthLogin(c, provider, code, state);
     if (!result.ok) return c.redirect(errorRedirect(result.reason));
     if (result.mode === "desktop") {
-      return c.html(desktopDoneHtml(result.token));
+      return c.html(desktopDoneHtml(result.code));
     }
     return c.redirect(result.redirect);
   });
@@ -310,7 +320,7 @@ export function registerProviderRoutes(auth: Hono<AppEnv>, provider: OAuthProvid
       return c.json({
         ok: true,
         mode: "desktop",
-        deepLink: `${DESKTOP_SCHEME}://oauth/callback?token=${encodeURIComponent(result.token)}`,
+        deepLink: `${DESKTOP_SCHEME}://oauth/callback?code=${encodeURIComponent(result.code)}`,
       });
     }
     return c.json({

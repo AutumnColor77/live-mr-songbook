@@ -1,6 +1,11 @@
 import { Hono } from "hono";
 import { newId } from "../../id";
 import { SYNC_MAX_BODY_BYTES, SYNC_MAX_SONGS, SYNC_THUMB_CONCURRENCY } from "../../limits";
+import {
+  clientIp,
+  consumeRateLimit,
+  rateLimitedResponse,
+} from "../../rate-limit";
 import { artistFromSync, normalizeKey, titleFromSync } from "../../song-key";
 import { persistThumbnail } from "../../thumbnails";
 import type { AppEnv, SongRow } from "../../types";
@@ -40,6 +45,17 @@ songSync.put("/songs/sync", async (c) => {
   const channel = c.get("channel");
   if (channel.slug === "demo") {
     return c.json({ error: "데모 채널은 수정할 수 없습니다." }, 403);
+  }
+
+  const limited = await consumeRateLimit(
+    c.env.DB,
+    `sync:${channel.id}:${clientIp(c)}`,
+    10,
+    60_000,
+  );
+  if (!limited.ok) {
+    const res = rateLimitedResponse(limited.retryAfterSec);
+    return c.json(res.body, res.status, res.headers);
   }
 
   const contentLength = Number(c.req.header("content-length") ?? 0);

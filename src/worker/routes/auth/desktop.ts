@@ -1,11 +1,13 @@
 import { Hono } from "hono";
-import { getCookie } from "hono/cookie";
-import { bearerToken, type OAuthProvider } from "../../crypto";
-import { loadUserFromSession, SESSION_COOKIE } from "../../session";
-import type { AppEnv } from "../../types";
-import { desktopDoneHtml } from "./desktop-html";
 import {
-  DESKTOP_SCHEME,
+  createDesktopHandoffCode,
+  exchangeDesktopHandoffCode,
+} from "../../desktop-handoff";
+import { type OAuthProvider } from "../../crypto";
+import { createSession, loadUserFromSession } from "../../session";
+import type { AppEnv } from "../../types";
+import { desktopDeepLink, desktopDoneHtml } from "./desktop-html";
+import {
   errorRedirect,
   providerConfigured,
   safeNextPath,
@@ -14,20 +16,38 @@ import { beginOAuth } from "./oauth-providers";
 
 const desktop = new Hono<AppEnv>();
 
-/** After profile setup on desktop browser, hand session token back to the app. */
+/** After profile setup on desktop browser, hand one-time code back to the app. */
 desktop.get("/desktop-handoff", async (c) => {
   const user = await loadUserFromSession(c);
   if (!user) return c.json({ error: "Unauthorized" }, 401);
 
-  const handoff =
-    getCookie(c, SESSION_COOKIE) || bearerToken(c.req.header("Authorization"));
-  if (!handoff) return c.json({ error: "Unauthorized" }, 401);
-
+  const code = await createDesktopHandoffCode(c.env.DB, user.id);
   return c.json({
     ok: true,
-    deepLink: `${DESKTOP_SCHEME}://oauth/callback?token=${encodeURIComponent(handoff)}`,
+    deepLink: desktopDeepLink(code),
     user,
   });
+});
+
+/** Exchange a one-time desktop handoff code for a session token (Manager app). */
+desktop.post("/desktop-exchange", async (c) => {
+  let body: { code?: string };
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "Invalid request" }, 400);
+  }
+
+  const code = typeof body.code === "string" ? body.code.trim() : "";
+  if (!code) return c.json({ error: "Missing code" }, 400);
+
+  const userId = await exchangeDesktopHandoffCode(c.env.DB, code);
+  if (!userId) {
+    return c.json({ error: "Invalid or expired code" }, 400);
+  }
+
+  const token = await createSession(c, userId);
+  return c.json({ ok: true, token });
 });
 
 /**
@@ -50,12 +70,9 @@ desktop.get("/desktop-connect", async (c) => {
       });
       return c.redirect(`/me/setup?${q}`);
     }
-    const token =
-      getCookie(c, SESSION_COOKIE) || bearerToken(c.req.header("Authorization"));
-    if (token) {
-      console.log("[auth] desktop-connect reused browser session", { userId: user.id });
-      return c.html(desktopDoneHtml(token));
-    }
+    const code = await createDesktopHandoffCode(c.env.DB, user.id);
+    console.log("[auth] desktop-connect reused browser session", { userId: user.id });
+    return c.html(desktopDoneHtml(code));
   }
 
   if (!provider) {

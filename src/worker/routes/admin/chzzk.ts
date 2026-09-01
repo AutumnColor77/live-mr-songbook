@@ -22,7 +22,7 @@ function sessionStub(env: AppEnv["Bindings"], channelId: string) {
 
 chzzkAdmin.get("/chzzk", async (c) => {
   const channelId = c.get("channel").id;
-  const link = await getChzzkLink(c.env.DB, channelId);
+  const link = await getChzzkLink(c.env.DB, channelId, c.env);
   const stub = sessionStub(c.env, channelId);
   let live = false;
   if (stub && link) {
@@ -76,14 +76,14 @@ chzzkAdmin.get("/chzzk/connect", async (c) => {
     if (wantsJson) return c.json({ url });
     return c.redirect(url);
   } catch (err) {
-    const msg = err instanceof Error ? err.message : "connect failed";
-    return c.json({ error: msg }, 500);
+    console.error("[chzzk] connect failed", err instanceof Error ? err.name : "error");
+    return c.json({ error: "Chzzk connect failed" }, 500);
   }
 });
 
 chzzkAdmin.delete("/chzzk", async (c) => {
   const channelId = c.get("channel").id;
-  const link = await getChzzkLink(c.env.DB, channelId);
+  const link = await getChzzkLink(c.env.DB, channelId, c.env);
   const stub = sessionStub(c.env, channelId);
   if (stub) {
     await stub.fetch("https://do/stop", { method: "POST" }).catch(() => undefined);
@@ -102,7 +102,7 @@ chzzkAdmin.delete("/chzzk", async (c) => {
 
 chzzkAdmin.post("/chzzk/session", async (c) => {
   const channelId = c.get("channel").id;
-  const link = await getChzzkLink(c.env.DB, channelId);
+  const link = await getChzzkLink(c.env.DB, channelId, c.env);
   if (!link) return c.json({ error: "Chzzk not linked" }, 400);
   const stub = sessionStub(c.env, channelId);
   if (!stub) return c.json({ error: "CHZZK_SESSION binding missing" }, 503);

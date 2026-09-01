@@ -5,6 +5,7 @@ main = "./src/worker/index.ts"
 
 [vars]
 PLATFORM_ADMIN_TOKEN = "test-platform-token-16chars"
+TOKEN_ENCRYPTION_KEY = "test-token-encryption-key-32chars"
 
 [[d1_databases]]
 binding = "DB"

@@ -1,3 +1,6 @@
+import { decryptSecret, encryptSecret } from "../token-crypto";
+import type { Bindings } from "../types";
+
 export type ChzzkLinkRow = {
   channel_id: string;
   chzzk_channel_id: string;
@@ -12,18 +15,31 @@ export type ChzzkLinkRow = {
   updated_at: number;
 };
 
+async function decryptLinkRow(row: ChzzkLinkRow, env: Bindings): Promise<ChzzkLinkRow> {
+  return {
+    ...row,
+    access_token: await decryptSecret(row.access_token, env),
+    refresh_token: await decryptSecret(row.refresh_token, env),
+  };
+}
+
 export async function getChzzkLink(
   db: D1Database,
   channelId: string,
+  env?: Bindings,
 ): Promise<ChzzkLinkRow | null> {
-  return db
+  const row = await db
     .prepare("SELECT * FROM channel_chzzk_links WHERE channel_id = ?")
     .bind(channelId)
     .first<ChzzkLinkRow>();
+  if (!row) return null;
+  if (!env) return row;
+  return decryptLinkRow(row, env);
 }
 
 export async function upsertChzzkLink(
   db: D1Database,
+  env: Bindings,
   row: {
     channelId: string;
     chzzkChannelId: string;
@@ -35,6 +51,8 @@ export async function upsertChzzkLink(
   },
 ): Promise<void> {
   const now = Date.now();
+  const accessToken = await encryptSecret(row.accessToken, env);
+  const refreshToken = await encryptSecret(row.refreshToken, env);
   await db
     .prepare(
       `INSERT INTO channel_chzzk_links (
@@ -55,8 +73,8 @@ export async function upsertChzzkLink(
       row.channelId,
       row.chzzkChannelId,
       row.chzzkChannelName,
-      row.accessToken,
-      row.refreshToken,
+      accessToken,
+      refreshToken,
       row.accessExpiresAt,
       row.scopes,
       now,
@@ -67,6 +85,7 @@ export async function upsertChzzkLink(
 
 export async function updateChzzkTokens(
   db: D1Database,
+  env: Bindings,
   channelId: string,
   tokens: {
     accessToken: string;
@@ -75,6 +94,8 @@ export async function updateChzzkTokens(
     scopes?: string;
   },
 ): Promise<void> {
+  const accessToken = await encryptSecret(tokens.accessToken, env);
+  const refreshToken = await encryptSecret(tokens.refreshToken, env);
   await db
     .prepare(
       `UPDATE channel_chzzk_links SET
@@ -83,8 +104,8 @@ export async function updateChzzkTokens(
        WHERE channel_id = ?`,
     )
     .bind(
-      tokens.accessToken,
-      tokens.refreshToken,
+      accessToken,
+      refreshToken,
       tokens.accessExpiresAt,
       tokens.scopes ?? null,
       Date.now(),

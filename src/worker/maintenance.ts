@@ -1,4 +1,5 @@
 import { migrateDataUrlThumbnails } from "./thumbnails";
+import { purgeExpiredHandoffCodes } from "./desktop-handoff";
 import type { Bindings } from "./types";
 
 /** Keep done/rejected history for duplicate/admin review, then drop. */
@@ -10,13 +11,14 @@ export async function runMaintenance(env: Bindings): Promise<{
   oauthStates: number;
   requests: number;
   rateBuckets: number;
+  handoffCodes: number;
   thumbnailsMigrated: number;
 }> {
   const now = Date.now();
   const requestCutoff = now - REQUEST_HISTORY_TTL_MS;
   const rateCutoff = now - RATE_BUCKET_TTL_MS;
 
-  const [sessions, oauthStates, requests, rateBuckets, thumbnailsMigrated] =
+  const [sessions, oauthStates, requests, rateBuckets, handoffCodes, thumbnailsMigrated] =
     await Promise.all([
       env.DB.prepare("DELETE FROM sessions WHERE expires_at < ?")
         .bind(now)
@@ -37,6 +39,7 @@ export async function runMaintenance(env: Bindings): Promise<{
         .bind(rateCutoff)
         .run()
         .then((r) => r.meta.changes ?? 0),
+      purgeExpiredHandoffCodes(env.DB),
       migrateDataUrlThumbnails(env, 40),
     ]);
 
@@ -45,6 +48,7 @@ export async function runMaintenance(env: Bindings): Promise<{
     oauthStates,
     requests,
     rateBuckets,
+    handoffCodes,
     thumbnailsMigrated,
   };
 }

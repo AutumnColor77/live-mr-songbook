@@ -1,7 +1,7 @@
 import { Hono } from "hono";
-import { cors } from "hono/cors";
 import { loadChannel } from "./auth";
 import { runMaintenance } from "./maintenance";
+import { apiCors, rateLimitByIp, securityHeaders } from "./security";
 import type { AppEnv, Bindings } from "./types";
 import songs from "./routes/songs";
 import status from "./routes/status";
@@ -19,20 +19,22 @@ import sitemap from "./routes/sitemap";
 
 const app = new Hono<AppEnv>();
 
-app.use(
-  "/api/*",
-  cors({
-    origin: (origin, c) => origin || new URL(c.req.url).origin,
-    credentials: true,
-  }),
-);
+app.use("*", securityHeaders);
+app.use("/api/*", apiCors());
 
 app.get("/api/health", (c) => c.json({ ok: true, service: "live-mr-songbook" }));
 app.route("/sitemap.xml", sitemap);
 
+app.use("/api/auth/*", rateLimitByIp("auth", 30, 60_000));
 app.route("/api/auth", authRoutes);
+
+app.use("/api/me/*", rateLimitByIp("me", 30, 60_000));
 app.route("/api/me", meRoutes);
+
+app.use("/api/directory/*", rateLimitByIp("directory", 60, 60_000));
 app.route("/api/directory", directory);
+
+app.use("/api/platform/*", rateLimitByIp("platform", 30, 60_000));
 app.route("/api/platform", platform);
 app.route("/api/media", media);
 

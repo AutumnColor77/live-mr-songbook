@@ -17,8 +17,18 @@ export function originFromRequest(url: string): string {
   return u.origin;
 }
 
-export function oauthStateSecret(env: AppEnv["Bindings"]): string {
-  return [env.GOOGLE_CLIENT_SECRET, env.NAVER_CLIENT_SECRET].filter(Boolean).join("|") || "dev";
+export function oauthStateSecretForProvider(
+  env: AppEnv["Bindings"],
+  provider: OAuthProvider,
+): string | null {
+  if (provider === "naver") {
+    return env.NAVER_CLIENT_SECRET?.trim() || null;
+  }
+  return env.GOOGLE_CLIENT_SECRET?.trim() || null;
+}
+
+export function chzzkStateSecret(env: AppEnv["Bindings"]): string | null {
+  return env.CHZZK_CLIENT_SECRET?.trim() || null;
 }
 
 export function googleConfigured(c: { env: AppEnv["Bindings"] }): boolean {

@@ -9,15 +9,7 @@ import { signChzzkLinkState, verifyChzzkLinkState } from "../../chzzk/link-state
 import { upsertChzzkLink } from "../../chzzk/links";
 import { loadUserFromSession } from "../../session";
 import type { AppEnv } from "../../types";
-import { originFromRequest } from "./helpers";
-
-function chzzkStateSecret(env: AppEnv["Bindings"]): string {
-  return (
-    [env.CHZZK_CLIENT_SECRET, env.GOOGLE_CLIENT_SECRET, env.NAVER_CLIENT_SECRET]
-      .filter(Boolean)
-      .join("|") || "dev"
-  );
-}
+import { chzzkStateSecret, originFromRequest } from "./helpers";
 
 const chzzkAuth = new Hono<AppEnv>();
 
@@ -39,7 +31,12 @@ chzzkAuth.get("/chzzk/callback", async (c) => {
     return c.redirect("/?auth=error&reason=missing_code");
   }
 
-  const payload = await verifyChzzkLinkState(chzzkStateSecret(c.env), state);
+  const secret = chzzkStateSecret(c.env);
+  if (!secret) {
+    return c.redirect("/?auth=error&reason=chzzk_not_configured");
+  }
+
+  const payload = await verifyChzzkLinkState(secret, state);
   if (!payload) {
     return c.redirect("/?auth=error&reason=invalid_state");
   }
@@ -59,7 +56,7 @@ chzzkAuth.get("/chzzk/callback", async (c) => {
       state,
     });
     const me = await fetchChzzkMe(tokens.accessToken);
-    await upsertChzzkLink(c.env.DB, {
+    await upsertChzzkLink(c.env.DB, c.env, {
       channelId: payload.channelId,
       chzzkChannelId: me.channelId,
       chzzkChannelName: me.channelName,
@@ -81,7 +78,7 @@ chzzkAuth.get("/chzzk/callback", async (c) => {
 
     return c.redirect(`/me?chzzk=ok`);
   } catch (err) {
-    console.error("[chzzk] oauth callback failed", err);
+    console.error("[chzzk] oauth callback failed", err instanceof Error ? err.name : "error");
     return c.redirect(`/me?chzzk=error&reason=token`);
   }
 });
@@ -93,7 +90,11 @@ export async function beginChzzkLink(
   if (!chzzkConfigured(env)) {
     throw new Error("Chzzk OAuth is not configured");
   }
-  const state = await signChzzkLinkState(chzzkStateSecret(env), {
+  const secret = chzzkStateSecret(env);
+  if (!secret) {
+    throw new Error("Chzzk OAuth is not configured");
+  }
+  const state = await signChzzkLinkState(secret, {
     channelId: opts.channelId,
     slug: opts.slug,
     userId: opts.userId,

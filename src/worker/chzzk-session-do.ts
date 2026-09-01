@@ -117,10 +117,11 @@ export class ChzzkSessionDO extends DurableObject<Bindings> {
           live: socketOpen(this.socket),
         });
       } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        await this.setStatus("error", msg);
+        const detail = err instanceof Error ? err.message : String(err);
+        await this.setStatus("error", detail);
         await this.scheduleReconnect();
-        return Response.json({ error: msg }, { status: 500 });
+        console.error("[ChzzkSessionDO] start failed", detail);
+        return Response.json({ error: "session start failed" }, { status: 500 });
       }
     }
 
@@ -164,9 +165,10 @@ export class ChzzkSessionDO extends DurableObject<Bindings> {
         try {
           await this.startSession();
         } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          await this.setStatus("error", msg);
-          return Response.json({ error: msg, live: false }, { status: 500 });
+          const detail = err instanceof Error ? err.message : String(err);
+          await this.setStatus("error", detail);
+          console.error("[ChzzkSessionDO] ensure failed", detail);
+          return Response.json({ error: "session start failed", live: false }, { status: 500 });
         }
       }
       return Response.json({
@@ -189,7 +191,7 @@ export class ChzzkSessionDO extends DurableObject<Bindings> {
     if (!this.channelId || !this.wantRunning) return;
 
     try {
-      const link = await getChzzkLink(this.env.DB, this.channelId);
+      const link = await getChzzkLink(this.env.DB, this.channelId, this.env);
 
       if (link?.session_status === "connecting") {
         const startedAt =
@@ -263,7 +265,7 @@ export class ChzzkSessionDO extends DurableObject<Bindings> {
   }
 
   private async ensureFreshToken(): Promise<string> {
-    const link = await getChzzkLink(this.env.DB, this.channelId);
+    const link = await getChzzkLink(this.env.DB, this.channelId, this.env);
     if (!link) throw new Error("Chzzk not linked");
 
     const skew = 5 * 60 * 1000;
@@ -281,7 +283,7 @@ export class ChzzkSessionDO extends DurableObject<Bindings> {
       refreshToken: link.refresh_token,
     });
     const expiresAt = Date.now() + tokens.expiresIn * 1000;
-    await updateChzzkTokens(this.env.DB, this.channelId, {
+    await updateChzzkTokens(this.env.DB, this.env, this.channelId, {
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
       accessExpiresAt: expiresAt,

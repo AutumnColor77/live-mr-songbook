@@ -6,6 +6,7 @@ preview_urls = true
 
 # Secrets (never commit values):
 #   npx wrangler secret put PLATFORM_ADMIN_TOKEN
+#   npx wrangler secret put TOKEN_ENCRYPTION_KEY
 #   npx wrangler secret put GOOGLE_CLIENT_ID
 #   npx wrangler secret put GOOGLE_CLIENT_SECRET
 #   npx wrangler secret put NAVER_CLIENT_ID
@@ -48,4 +49,43 @@ crons = ["0 */6 * * *"]
 not_found_handling = "single-page-application"
 binding = "ASSETS"
 # Browser navigations (OAuth callback) must hit the Worker, not index.html
+run_worker_first = ["/api/*", "/sitemap.xml"]
+
+# Production deploy: npm run deploy (uses --env production)
+[env.production]
+workers_dev = false
+preview_urls = false
+
+[[env.production.routes]]
+pattern = "livemrsongbook.com"
+custom_domain = true
+
+[[env.production.routes]]
+pattern = "www.livemrsongbook.com"
+custom_domain = true
+
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "live-mr-songbook"
+database_id = "e2842118-6029-41bc-b309-f8e0a1b8bed1"
+migrations_dir = "migrations"
+
+[[env.production.kv_namespaces]]
+binding = "THUMB_KV"
+id = "6dccf2d52ba3422a9778576865e5fffa"
+
+[[env.production.durable_objects.bindings]]
+name = "CHZZK_SESSION"
+class_name = "ChzzkSessionDO"
+
+[[env.production.migrations]]
+tag = "chzzk-session-v1"
+new_sqlite_classes = ["ChzzkSessionDO"]
+
+[env.production.triggers]
+crons = ["0 */6 * * *"]
+
+[env.production.assets]
+not_found_handling = "single-page-application"
+binding = "ASSETS"
 run_worker_first = ["/api/*", "/sitemap.xml"]

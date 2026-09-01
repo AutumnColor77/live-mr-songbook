@@ -1,5 +1,8 @@
 PLATFORM_ADMIN_TOKEN=dev-platform-token
 
+# Chzzk OAuth token encryption at rest (optional locally; falls back to PLATFORM_ADMIN_TOKEN)
+TOKEN_ENCRYPTION_KEY=
+
 # Google OAuth (https://console.cloud.google.com/apis/credentials)
 # Redirect URI (local): http://localhost:5173/api/auth/google/callback
 # Redirect URI (prod):  https://livemrsongbook.com/api/auth/google/callback

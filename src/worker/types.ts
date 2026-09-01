@@ -10,6 +10,8 @@ export type Bindings = {
   CHZZK_CLIENT_ID?: string;
   CHZZK_CLIENT_SECRET?: string;
   CHZZK_SESSION?: DurableObjectNamespace;
+  /** AES-GCM key material for Chzzk OAuth tokens at rest (falls back to PLATFORM_ADMIN_TOKEN). */
+  TOKEN_ENCRYPTION_KEY?: string;
 };
 
 export type ChannelRow = {
