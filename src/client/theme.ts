@@ -22,7 +22,7 @@ export function logoSrc(theme: Theme): string {
 export function logoLinkHtml(options?: { fetchpriority?: boolean }): string {
   const fetchpriority = options?.fetchpriority ? ' fetchpriority="high"' : "";
   return `<a href="/" class="min-w-0 shrink-0 block">
-    <img class="logo-lockup" src="${logoSrc(currentTheme())}" width="480" height="120" alt="Live MR Songbook 홈"${fetchpriority} />
+    <img class="logo-lockup" src="${logoSrc(currentTheme())}" width="1920" height="472" alt="Live MR Songbook 홈"${fetchpriority} />
   </a>`;
 }
 
@@ -32,8 +32,8 @@ export function heroLogoHtml(options?: { fetchpriority?: boolean }): string {
   return `<img
     class="logo-lockup landing-hero-logo"
     src="${logoSrc(currentTheme())}"
-    width="480"
-    height="120"
+    width="1920"
+    height="472"
     alt="Live MR Songbook"${fetchpriority}
   />`;
 }

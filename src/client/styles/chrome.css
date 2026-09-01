@@ -79,7 +79,7 @@ button,
 .logo-lockup {
   height: 34px;
   width: auto;
-  aspect-ratio: 4 / 1;
+  aspect-ratio: 1920 / 472;
   display: block;
   flex-shrink: 0;
 }

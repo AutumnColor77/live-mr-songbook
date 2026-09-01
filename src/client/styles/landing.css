@@ -93,7 +93,7 @@
 .landing-hero-logo {
   height: clamp(48px, 10vw, 72px);
   width: auto;
-  aspect-ratio: 4 / 1;
+  aspect-ratio: 1920 / 472;
   display: block;
   margin: 0 auto;
   filter: drop-shadow(0 8px 28px color-mix(in srgb, var(--accent-primary) 35%, transparent));
