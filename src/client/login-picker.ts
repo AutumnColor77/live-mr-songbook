@@ -1,4 +1,9 @@
 import { startOAuthLogin, type OAuthProvider } from "./auth-api";
+import {
+  COMPANION_PRIVACY_URL,
+  COMPANION_TERMS_URL,
+  externalLinkHtml,
+} from "./companion-links";
 import { escapeHtml } from "./dom";
 import { icons } from "./icons";
 
@@ -58,6 +63,10 @@ export function loginPickerOverlayHtml(providers: LoginProviders): string {
           <p class="text-xs text-dim">사용할 계정을 골라 주세요.</p>
         </div>
         <div class="space-y-2.5">${options}</div>
+        <p class="text-xs text-dim text-center leading-relaxed">
+          로그인하면 ${externalLinkHtml(COMPANION_TERMS_URL, "이용약관", "underline")}과
+          ${externalLinkHtml(COMPANION_PRIVACY_URL, "개인정보 처리방침", "underline")}에 동의하게 됩니다.
+        </p>
         <button type="button" id="login-picker-close" class="secondary-btn w-full">취소</button>
       </div>
     </div>

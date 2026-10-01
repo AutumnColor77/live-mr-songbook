@@ -1,3 +1,4 @@
+import { COMPANION_PRIVACY_URL, externalLinkHtml } from "../companion-links";
 import { icons } from "../icons";
 import { logoLinkHtml } from "../theme";
 
@@ -139,6 +140,11 @@ export function songbookShellHtml(opts: {
           </div>
           <p id="req-paid-hint" class="text-xs font-semibold text-accent" hidden></p>
         </div>
+
+        <p class="mb-4 text-xs text-dim leading-relaxed">
+          신청자 닉네임은 대기열에 공개됩니다.
+          ${externalLinkHtml(COMPANION_PRIVACY_URL, "개인정보 처리방침", "underline")}
+        </p>
 
         <div class="flex gap-2.5">
           <button id="close-request-modal" type="button" class="secondary-btn flex-1">취소</button>

@@ -1,5 +1,10 @@
 import { safeNextPath } from "../auth-feedback";
 import {
+  COMPANION_PRIVACY_URL,
+  COMPANION_TERMS_URL,
+  externalLinkHtml,
+} from "../companion-links";
+import {
   createChannel,
   deleteAccount,
   fetchSession,
@@ -165,6 +170,10 @@ export async function mountAccount(
             <form id="delete-account-form" class="mt-4 space-y-3 text-center">
               <p class="text-xs text-dim leading-relaxed">
                 계정과 소유 채널·곡·대기열·치지직 연결이 영구 삭제됩니다. 되돌릴 수 없습니다.
+              </p>
+              <p class="text-xs text-dim">
+                ${externalLinkHtml(COMPANION_PRIVACY_URL, "개인정보 처리방침", "underline")}
+                · ${externalLinkHtml(COMPANION_TERMS_URL, "이용약관", "underline")}
               </p>
               <label class="block text-left space-y-1.5">
                 <span class="account-kicker">확인을 위해 「탈퇴」를 입력</span>

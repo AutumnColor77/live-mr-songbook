@@ -1,5 +1,12 @@
 import { logout, type AuthUser } from "../auth-api";
 import {
+  AUTUMN_TOOLS_DISCORD_URL,
+  COMPANION_FAQ_URL,
+  COMPANION_PRIVACY_URL,
+  COMPANION_TERMS_URL,
+  externalLinkHtml,
+} from "../companion-links";
+import {
   fetchDirectoryChannels,
   type DirectoryChannel,
 } from "../directory-api";
@@ -188,6 +195,12 @@ export function mountLanding(
       </main>
       <footer class="landing-footer">
         <p>라이브 MR을 다루는 <a href="https://github.com/AutumnColor77/Live-MR-Manager/releases" target="_blank" rel="noopener noreferrer">Live MR Manager (LMRM)</a>도 사용해보세요.</p>
+        <p>
+          ${externalLinkHtml(COMPANION_TERMS_URL, "이용약관")}
+          · ${externalLinkHtml(COMPANION_PRIVACY_URL, "개인정보 처리방침")}
+          · ${externalLinkHtml(COMPANION_FAQ_URL, "도움말")}
+          · ${externalLinkHtml(AUTUMN_TOOLS_DISCORD_URL, "Autumn Tools Discord")}
+        </p>
       </footer>
       ${loginPickerOverlayHtml(providers)}
       <div id="toast" class="toast" hidden></div>
