@@ -1,4 +1,4 @@
-export const COMPANION_BASE = "https://lmrm.vercel.app";
+export const COMPANION_BASE = "https://autumntools.vercel.app";
 
 export const COMPANION_TERMS_URL = `${COMPANION_BASE}/terms`;
 export const COMPANION_PRIVACY_URL = `${COMPANION_BASE}/privacy`;
