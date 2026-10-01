@@ -1,6 +1,7 @@
 import { AdminAuthError, verifyAdminAccess } from "./admin-api";
 import { mountDashboard } from "./admin/dashboard";
 import { mountLogin } from "./admin/login";
+import { mountSongLibrary } from "./admin/songs";
 import {
   fetchAuthStatus,
   fetchSession,
@@ -8,9 +9,15 @@ import {
 import { consumeAuthQuery } from "./auth-feedback";
 import { applyTheme, currentTheme } from "./theme";
 
-export async function mountAdmin(root: HTMLElement, slug: string): Promise<void> {
+export type AdminView = "queue" | "songs";
+
+export async function mountAdmin(
+  root: HTMLElement,
+  slug: string,
+  view: AdminView = "queue",
+): Promise<void> {
   applyTheme(currentTheme());
-  document.title = `운영 · Live MR Songbook`;
+  document.title = view === "songs" ? "곡 관리 · Live MR Songbook" : "운영 · Live MR Songbook";
 
   const { toast, errorNotice } = consumeAuthQuery();
   const [session, status] = await Promise.all([fetchSession(), fetchAuthStatus()]);
@@ -42,5 +49,9 @@ export async function mountAdmin(root: HTMLElement, slug: string): Promise<void>
     return;
   }
 
+  if (view === "songs") {
+    await mountSongLibrary(root, slug);
+    return;
+  }
   await mountDashboard(root, slug, user, "", toast);
 }

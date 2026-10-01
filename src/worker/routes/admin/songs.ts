@@ -47,6 +47,7 @@ songs.post("/songs", async (c) => {
     thumbnail?: string | null;
     originalUrl?: string | null;
     enabled?: boolean;
+    origin?: string;
   };
   try {
     body = await c.req.json();
@@ -75,9 +76,20 @@ songs.post("/songs", async (c) => {
     body.thumbnail,
   );
 
-  await c.env.DB.prepare(INSERT_SONG_SQL)
-    .bind(...songInsertBinds(id, channelId, fields, thumbnail, now))
-    .run();
+  const insert = c.env.DB.prepare(INSERT_SONG_SQL).bind(
+    ...songInsertBinds(id, channelId, fields, thumbnail, now),
+  );
+  if (body.origin === "web") {
+    await c.env.DB.batch([
+      insert,
+      c.env.DB.prepare("UPDATE songs SET origin = 'web' WHERE id = ? AND channel_id = ?").bind(
+        id,
+        channelId,
+      ),
+    ]);
+  } else {
+    await insert.run();
+  }
 
   const row = await c.env.DB.prepare("SELECT * FROM songs WHERE id = ?")
     .bind(id)
@@ -116,6 +128,9 @@ songs.patch("/songs/:id", async (c) => {
   }
 
   const fields = mergePatchSongFields(existing, body);
+  if (!fields.title || !fields.artist) {
+    return c.json({ error: "title and artist are required" }, 400);
+  }
   const thumbnail =
     body.thumbnail !== undefined
       ? await persistThumbnail(

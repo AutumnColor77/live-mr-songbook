@@ -175,6 +175,7 @@ songSync.put("/songs/sync", async (c) => {
   if (disableMissing) {
     for (const row of results ?? []) {
       if (row.enabled !== 1) continue;
+      if (row.origin === "web") continue;
       const key = normalizeKey(row.title, row.artist);
       if (payloadKeys.has(key)) continue;
       disableIds.push(row.id);

@@ -50,6 +50,7 @@ export async function mountAccount(
           </div>
           <div class="flex gap-2">
             <a href="/c/${escapeHtml(own.slug)}/admin" class="primary-btn btn-sm flex-1 text-center">운영하기</a>
+            <a href="/c/${escapeHtml(own.slug)}/admin/songs" class="secondary-btn btn-sm flex-1 text-center">곡 관리</a>
             <a href="/c/${escapeHtml(own.slug)}" class="secondary-btn btn-sm flex-1 text-center" target="_blank" rel="noopener">노래책 열기</a>
           </div>
           <button type="button" id="copy-channel-url" class="secondary-btn btn-sm w-full">노래책 주소 복사</button>

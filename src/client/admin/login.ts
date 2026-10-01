@@ -21,6 +21,8 @@ export function mountLogin(
   },
 ): void {
   stopAdminPolling();
+  const adminBase = `/c/${slug}/admin`;
+  const next = location.pathname.startsWith(adminBase) ? location.pathname : adminBase;
   const own = channels.find((ch) => ch.slug !== "demo") ?? null;
   const ownAdminLink =
     user && own && own.slug !== slug
@@ -56,7 +58,7 @@ export function mountLogin(
                  <button id="admin-logout" type="button" class="secondary-btn w-full">다른 계정으로</button></div>`
               : ""
           }
-          ${user ? "" : loginButtonHtml(providers, "로그인", { next: `/c/${slug}/admin` })}
+          ${user ? "" : loginButtonHtml(providers, "로그인", { next })}
           <p class="text-xs text-dim leading-relaxed">
             ${user ? "이 채널의 운영 멤버만 대기열을 관리할 수 있습니다." : "로그인하면 대기열을 관리할 수 있습니다."}
           </p>
@@ -69,7 +71,7 @@ export function mountLogin(
 
   const toastCtrl = createToast(root);
 
-  bindLoginPicker({ next: `/c/${slug}/admin`, onToast: (msg) => toastCtrl.show(msg) });
+  bindLoginPicker({ next, onToast: (msg) => toastCtrl.show(msg) });
 
   const logoutBtn = document.querySelector("#admin-logout");
   if (logoutBtn) {

@@ -1,5 +1,5 @@
 import "./style.css";
-import { mountAdmin } from "./admin";
+import { mountAdmin, type AdminView } from "./admin";
 import { consumeAuthQuery } from "./auth-feedback";
 import {
   exchangeOAuthCode,
@@ -21,12 +21,13 @@ const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
 const app = document.querySelector<HTMLDivElement>("#app");
 if (!app) throw new Error("#app missing");
 
-function parseChannelPath(): { slug: string; admin: boolean } | null {
-  const match = /^\/c\/([^/]+)(?:\/(admin))?\/?$/i.exec(location.pathname);
+function parseChannelPath(): { slug: string; admin: AdminView | null } | null {
+  const match = /^\/c\/([^/]+)(?:\/(admin)(?:\/(songs))?)?\/?$/i.exec(location.pathname);
   if (!match) return null;
   const slug = match[1]!.toLowerCase();
   if (!SLUG_RE.test(slug)) return null;
-  return { slug, admin: (match[2] ?? "").toLowerCase() === "admin" };
+  if (!match[2]) return { slug, admin: null };
+  return { slug, admin: match[3] ? "songs" : "queue" };
 }
 
 async function handleOAuthCallbackFallback(): Promise<boolean> {
@@ -133,7 +134,7 @@ async function boot() {
       return;
     }
     if (parsed.admin) {
-      await mountAdmin(app!, parsed.slug);
+      await mountAdmin(app!, parsed.slug, parsed.admin);
       return;
     }
     await mountSongbook(app!, parsed.slug);

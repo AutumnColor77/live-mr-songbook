@@ -13,6 +13,23 @@ export type Song = {
   originalUrl?: string | null;
 };
 
+export type AdminSong = Song & {
+  origin: "push" | "web";
+  enabled: boolean;
+  createdAt: number;
+  updatedAt: number;
+};
+
+export type SongEditInput = {
+  title: string;
+  artist: string;
+  genre: string;
+  difficulty: number | null;
+  donationAmount: number | null;
+  originalUrl: string | null;
+  tags: string[];
+};
+
 export type SongRequest = {
   id: string;
   songId: string | null;

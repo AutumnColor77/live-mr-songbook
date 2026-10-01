@@ -84,6 +84,7 @@ describe("PUT /api/c/:slug/admin/songs/sync", () => {
 
   beforeEach(async () => {
     await env.DB.prepare("DELETE FROM songs WHERE channel_id = ?").bind(CHANNEL_ID).run();
+    await env.DB.prepare("DELETE FROM rate_buckets").run();
   });
 
   it("adds 100 songs to an empty channel", async () => {
@@ -179,6 +180,32 @@ describe("PUT /api/c/:slug/admin/songs/sync", () => {
       .bind(CHANNEL_ID)
       .first<{ n: number }>();
     expect(disabled?.n).toBe(3);
+  });
+
+  it("keeps web-origin songs when disableMissing is set", async () => {
+    await authApi(`/api/c/${SLUG}/admin/songs/sync`, {
+      method: "PUT",
+      body: JSON.stringify({ songs: makeSongs(2) }),
+    });
+    const created = await authApi(`/api/c/${SLUG}/admin/songs`, {
+      method: "POST",
+      body: JSON.stringify({ title: "Web Only", artist: "Streamer", origin: "web" }),
+    });
+    expect(created.status).toBe(201);
+    const { song } = (await created.json()) as { song: { id: string; origin: string } };
+    expect(song.origin).toBe("web");
+
+    const res = await authApi(`/api/c/${SLUG}/admin/songs/sync`, {
+      method: "PUT",
+      body: JSON.stringify({ songs: makeSongs(1), disableMissing: true }),
+    });
+    const body = (await res.json()) as SyncResponse;
+    expect(body.disabled).toBe(1);
+
+    const row = await env.DB.prepare("SELECT enabled FROM songs WHERE id = ?")
+      .bind(song.id)
+      .first<{ enabled: number }>();
+    expect(row?.enabled).toBe(1);
   });
 
   it("fails a data URL thumbnail over 80_000 chars", async () => {

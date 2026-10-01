@@ -1,4 +1,4 @@
-import type { SongRequest, StatusResponse } from "./types";
+import type { AdminSong, SongEditInput, SongRequest, StatusResponse } from "./types";
 
 export class AdminAuthError extends Error {
   constructor(message = "Unauthorized") {
@@ -87,6 +87,31 @@ export async function patchAdminSettings(
     method: "PATCH",
     body: JSON.stringify(body),
   });
+}
+
+export async function fetchAdminSongs(slug: string): Promise<AdminSong[]> {
+  const data = await adminFetch<{ songs: AdminSong[] }>(slug, "/songs");
+  return data.songs;
+}
+
+export async function createAdminSong(slug: string, input: SongEditInput): Promise<AdminSong> {
+  const data = await adminFetch<{ song: AdminSong }>(slug, "/songs", {
+    method: "POST",
+    body: JSON.stringify({ ...input, origin: "web" }),
+  });
+  return data.song;
+}
+
+export async function patchAdminSong(
+  slug: string,
+  id: string,
+  body: Partial<SongEditInput> & { enabled?: boolean },
+): Promise<AdminSong> {
+  const data = await adminFetch<{ song: AdminSong }>(slug, `/songs/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+  return data.song;
 }
 
 export async function fetchPublicStatus(slug: string): Promise<StatusResponse> {

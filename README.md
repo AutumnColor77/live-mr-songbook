@@ -140,7 +140,7 @@ npx wrangler secret put CHZZK_CLIENT_SECRET
 
 | Method | Path |
 |--------|------|
-| `GET/POST` | `/api/c/:slug/admin/songs` |
+| `GET/POST` | `/api/c/:slug/admin/songs` (POST body `origin: "web"`이면 웹 추가 곡으로 표시 — sync `disableMissing` 대상 제외) |
 | `PUT` | `/api/c/:slug/admin/songs/sync` body `{ songs, disableMissing? }` (아래 bulk upsert) |
 | `PATCH/DELETE` | `/api/c/:slug/admin/songs/:id` |
 | `GET` | `/api/c/:slug/admin/requests` |
@@ -165,6 +165,7 @@ npx wrangler secret put CHZZK_CLIENT_SECRET
 - `/me` — 채널 생성/수정(표시 이름·슬러그), 프로필 편집, 계정 탈퇴(소유 채널 cascade 삭제)
 - `/c/:slug` — 시청자: 검색, 접이식 **장르·가수** 필터, 리스트/버튼 모드, 썸네일·난이도, 신청·대기열·Now Playing
 - `/c/:slug/admin` — 운영: 신청 on/off, 중복 정책(허용/대기열만/부른 곡 포함), 대기열 재생/완료/거절·드래그 순서·비우기(세션 초기화)
+- `/c/:slug/admin/songs` — 곡 관리: 목록·검색, 곡 추가·수정(제목·가수·장르·난이도·후원 금액·재생 링크 `originalUrl`·MR 여부 = `tags`의 `"MR"`), 노래책 표시/숨기기
 - 테마: 다크 / 라이트 / 핑크 / 스카이
 
 ## Live MR Manager 연동
@@ -213,7 +214,7 @@ Request:
 
 - `title` 빈 문자열 → 해당 항목 skip (에러 아님). `artist` 생략/빈 값 → `"Unknown"`.
 - 채널 내 `(normalizedTitle, normalizedArtist)` 로 lookup. 없으면 INSERT, 있으면 필드 비교 후 UPDATE 또는 skip. push 시 `enabled`는 항상 `true`.
-- `disableMissing: true`이면 이번 payload 키에 없는 **현재 enabled** 곡만 `enabled=false`. DELETE 금지.
+- `disableMissing: true`이면 이번 payload 키에 없는 **현재 enabled** 곡만 `enabled=false`. DELETE 금지. 웹 곡 관리에서 추가한 곡(`origin = 'web'`)은 제외.
 - 썸네일: `http(s)` URL, JPEG data URL(`data:image/jpeg;base64,...`, 최대 80,000자), 또는 이미 저장된 `/api/media/thumbs/...`. 초과 data URL은 해당 항목 fail.
 - `originalUrl`은 `http(s)`만. 로컬 경로(`C:\...`, `/Users/...`)는 해당 항목 fail.
 - 항목 검증 실패는 나머지 곡을 적용한 뒤 **200** + `failed`/`errors`. JSON 오류는 `400`, 배열 오류는 `422`, 미인증 `401`, 채널 없음 `404`.

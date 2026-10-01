@@ -31,7 +31,8 @@
 - [x] 썸네일·난이도(★) 표시
 - [x] 테마(다크/라이트/핑크/스카이)
 - [x] 운영 admin 대기열 드래그 순서(`sort_order`)
-- [ ] 웹 관리자용 곡 CRUD UI(현재는 API + Manager Push)
+- [x] 웹 곡 관리 `/c/:slug/admin/songs` — 목록·추가·수정·표시/숨기기 (`songs.origin = 'web'`은 Push `disableMissing` 대상 제외)
+- [ ] 웹 곡 하드 삭제·태그/키/BPM 편집
 - [ ] 정렬 옵션(제목 외 최신·난이도 등)
 
 ## 4. Manager 연동

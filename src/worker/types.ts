@@ -74,10 +74,13 @@ export type SongRow = {
   donation_amount: number | null;
   thumbnail: string;
   original_url?: string | null;
+  origin?: string | null;
   enabled: number;
   created_at: number;
   updated_at: number;
 };
+
+export type SongOrigin = "push" | "web";
 
 export type RequestRow = {
   id: string;
@@ -108,6 +111,7 @@ export type Song = {
   donationAmount: number | null;
   thumbnail: string;
   originalUrl: string | null;
+  origin: SongOrigin;
   enabled: boolean;
   createdAt: number;
   updatedAt: number;
@@ -215,6 +219,7 @@ export function mapSong(row: SongRow): Song {
     donationAmount: donation,
     thumbnail: row.thumbnail ?? "",
     originalUrl: row.original_url?.trim() ? row.original_url.trim() : null,
+    origin: row.origin === "web" ? "web" : "push",
     enabled: row.enabled === 1,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

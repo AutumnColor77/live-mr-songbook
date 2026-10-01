@@ -246,6 +246,128 @@
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent-primary) 18%, transparent);
 }
 
+/* --- Admin song library (/c/:slug/admin/songs) --- */
+.admin-library {
+  padding: 1.15rem 1.15rem 1.25rem;
+}
+
+.admin-library-note {
+  margin: 0 0 0.85rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+
+.admin-library-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+
+.admin-library-toolbar .search-box {
+  height: 44px;
+}
+
+.view-modes .admin-library-filter {
+  width: auto;
+  padding: 0 12px;
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.admin-song-row {
+  align-items: center;
+}
+
+.admin-song-row.is-disabled .song-name,
+.admin-song-row.is-disabled .song-artist,
+.admin-song-row.is-disabled .admin-song-art {
+  opacity: 0.5;
+}
+
+.admin-song-art {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  box-shadow: none;
+}
+
+.admin-song-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.admin-song-badges:empty {
+  display: none;
+}
+
+.admin-song-badge {
+  font-size: 0.65rem;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 6px;
+  color: var(--text-muted);
+  background: var(--surface-2);
+  border: 1px solid var(--glass-border);
+  white-space: nowrap;
+}
+
+.admin-song-badge.is-hidden {
+  color: var(--text-inverse);
+  background: var(--text-dim);
+}
+
+.admin-song-mr-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: var(--text-main);
+  cursor: pointer;
+  user-select: none;
+}
+
+.admin-song-mr-check input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent-primary);
+  cursor: pointer;
+}
+
+.admin-song-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.admin-song-actions .btn-sm {
+  height: 30px;
+  padding: 0 10px;
+  font-size: 0.75rem;
+}
+
+@media (max-width: 479px) {
+  .admin-song-row {
+    flex-wrap: wrap;
+  }
+
+  .admin-song-actions {
+    width: 100%;
+  }
+
+  .admin-song-actions .btn-sm {
+    flex: 1 1 0;
+  }
+}
+
 @keyframes adminOpsGlow {
   from {
     opacity: 0.85;
